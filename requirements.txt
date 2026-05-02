@@ -1,0 +1,12 @@
+python-dotenv
+pyyaml
+youtube-transcript-api
+mcp
+langchain
+langchain-core
+langgraph
+langchain-mcp-adapters
+langchain-google-genai
+langchain-openai
+langchain-anthropic
+streamlit

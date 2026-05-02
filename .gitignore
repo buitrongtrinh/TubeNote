@@ -1,0 +1,64 @@
+# ==============================================================================
+# Secrets — TUYỆT ĐỐI KHÔNG commit
+# ==============================================================================
+.env
+.env.*
+!.env.example
+
+# Cookies YouTube — chứa session login cá nhân
+cookies/*.txt
+*_cookies.txt
+!cookies/.gitkeep
+
+# ==============================================================================
+# Build / runtime artifacts
+# ==============================================================================
+# TTS output / audio binaries
+output/audio/*.mp3
+output/audio/*.wav
+output/audio/*.ogg
+!output/audio/.gitkeep
+*.wav
+*.mp3
+*.ogg
+*.flac
+
+# Personal experiments / models / notebooks (không phải code production)
+TTS_model/
+*.ipynb
+*.ipynb_checkpoints/
+test_*.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# ==============================================================================
+# IDE / Editor
+# ==============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ==============================================================================
+# Streamlit
+# ==============================================================================
+.streamlit/secrets.toml
+
+# ==============================================================================
+# Claude / AI tooling
+# ==============================================================================
+.claude/

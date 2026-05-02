@@ -1,0 +1,45 @@
+# ==============================================================================
+# Link2Slide — cấu hình non-secret.
+# Secret (API key, cookies) để trong .env.
+# ==============================================================================
+
+llm:
+  # Provider mặc định. Override bằng env LLM_PROVIDER hoặc UI.
+  provider: google
+
+  google:
+    model: gemini-2.5-flash
+    temperature: 0.3
+
+  openai:
+    model: gpt-4o-mini
+    temperature: 0.3
+
+  anthropic:
+    model: claude-haiku-4-5
+    temperature: 0.3
+
+transcript:
+  # Thứ tự ngôn ngữ ưu tiên khi fetch phụ đề.
+  default_languages: [vi, en]
+
+cookies:
+  # KHÔNG set ở đây để giữ rule "single source of truth" trong .env.
+  # Bật cookies bằng YT_COOKIES_DIR / YT_COOKIES_PATH trong .env.
+  dir: null
+  single_file: null
+
+tts:
+  # Provider TTS. edge_tts free, hỗ trợ tiếng Việt tốt.
+  # Khác: gtts | openai | elevenlabs | coqui
+  provider: edge_tts
+  default_voice: vi-VN-HoaiMyNeural   # nữ. Nam: vi-VN-NamMinhNeural
+  output_dir: output/audio
+
+agent:
+  max_iterations: 6
+
+ui:
+  title: "YouTube Summarizer"
+  page_icon: "🎬"
+  caption: "LangGraph + MCP (stdio) + multi-provider LLM (Gemini / OpenAI / Anthropic)."

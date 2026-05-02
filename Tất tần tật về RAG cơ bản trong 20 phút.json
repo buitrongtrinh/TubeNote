@@ -1,0 +1,3706 @@
+{
+    "metadata": {
+        "video_id": "NQOYXmZxqvI",
+        "title": "Tất tần tật về RAG cơ bản trong 20 phút",
+        "channel": "Việt Nguyễn AI",
+        "channel_url": "https://www.youtube.com/@vietnh1009",
+        "thumbnail": "https://i.ytimg.com/vi/NQOYXmZxqvI/hqdefault.jpg"
+    },
+    "data": [
+        {
+            "text": "Xin chào các bạn. Hôm nay trong video",
+            "start": 0.16,
+            "duration": 4.0
+        },
+        {
+            "text": "này chúng ta sẽ cùng nhau nói về một kỹ",
+            "start": 2.12,
+            "duration": 3.759
+        },
+        {
+            "text": "thuật được sử dụng vô cùng phổ biến và",
+            "start": 4.16,
+            "duration": 3.599
+        },
+        {
+            "text": "rộng rãi trong các hệ thống AI hiện đại",
+            "start": 5.879,
+            "duration": 4.001
+        },
+        {
+            "text": "ngày nay. Một kỹ thuật giúp cho chúng ta",
+            "start": 7.759,
+            "duration": 4.201
+        },
+        {
+            "text": "có thể truy xuất và tìm kiếm thông tin",
+            "start": 9.88,
+            "duration": 4.36
+        },
+        {
+            "text": "một cách chính xác và đáng tin cậy hơn.",
+            "start": 11.96,
+            "duration": 4.84
+        },
+        {
+            "text": "Đó chính là Receiver A Generation hay",
+            "start": 14.24,
+            "duration": 4.44
+        },
+        {
+            "text": "viết tắt là Drag. Nếu các bạn là những",
+            "start": 16.8,
+            "duration": 4.16
+        },
+        {
+            "text": "người đang học hoặc đang làm về AI hay",
+            "start": 18.68,
+            "duration": 3.64
+        },
+        {
+            "text": "các bạn chỉ đơn giản là những người",
+            "start": 20.96,
+            "duration": 3.04
+        },
+        {
+            "text": "thường xuyên theo dõi các thông tin có",
+            "start": 22.32,
+            "duration": 3.48
+        },
+        {
+            "text": "liên quan đến AI, có lẽ các bạn không",
+            "start": 24.0,
+            "duration": 4.679
+        },
+        {
+            "text": "còn xa lạ gì với thuật ngữ RAC này.",
+            "start": 25.8,
+            "duration": 5.479
+        },
+        {
+            "text": "Trước khi đi sâu và phân tích RAC là gì",
+            "start": 28.679,
+            "duration": 4.801
+        },
+        {
+            "text": "hay là RAC hoạt động như thế nào, chúng",
+            "start": 31.279,
+            "duration": 4.44
+        },
+        {
+            "text": "ta hãy cùng nhau nói về các công cụ AI",
+            "start": 33.48,
+            "duration": 4.239
+        },
+        {
+            "text": "mà chúng ta vẫn thừa sử hàng ngày. Ví dụ",
+            "start": 35.719,
+            "duration": 5.121
+        },
+        {
+            "text": "như là chat GPT, GBIN, Dipsic hay là",
+            "start": 37.719,
+            "duration": 5.121
+        },
+        {
+            "text": "Clode. Thông thường thì người dùng như",
+            "start": 40.84,
+            "duration": 4.199
+        },
+        {
+            "text": "chúng ta sử dụng các công cụ AI này vào",
+            "start": 42.84,
+            "duration": 3.44
+        },
+        {
+            "text": "rất nhiều các mục đích đa dạng khác",
+            "start": 45.039,
+            "duration": 3.961
+        },
+        {
+            "text": "nhau. Ví dụ như là đối với học sinh thì",
+            "start": 46.28,
+            "duration": 4.439
+        },
+        {
+            "text": "các học sinh có thể dùng các công cụ này",
+            "start": 49.0,
+            "duration": 3.96
+        },
+        {
+            "text": "để có thể làm bài tập hàng ngày. Thế còn",
+            "start": 50.719,
+            "duration": 4.48
+        },
+        {
+            "text": "với sinh viên mà cụ thể là với sinh viên",
+            "start": 52.96,
+            "duration": 3.919
+        },
+        {
+            "text": "IT thì chúng ta có thể sử dụng các công",
+            "start": 55.199,
+            "duration": 3.84
+        },
+        {
+            "text": "vụ này để có thể lập trình chẳng hạn.",
+            "start": 56.879,
+            "duration": 3.84
+        },
+        {
+            "text": "Thế còn với người đi làm thì họ thường",
+            "start": 59.039,
+            "duration": 3.921
+        },
+        {
+            "text": "sử dụng các công cụ AI như là chat GPT",
+            "start": 60.719,
+            "duration": 4.08
+        },
+        {
+            "text": "để có thể hỗ trợ công việc hàng ngày của",
+            "start": 62.96,
+            "duration": 4.36
+        },
+        {
+            "text": "họ. Trong số tất cả các tác vụ mà chúng",
+            "start": 64.799,
+            "duration": 4.401
+        },
+        {
+            "text": "ta thường sử dụng các công cụ AI để có",
+            "start": 67.32,
+            "duration": 4.119
+        },
+        {
+            "text": "thể giải quyết thì có một loại tác vụ mà",
+            "start": 69.2,
+            "duration": 4.239
+        },
+        {
+            "text": "chúng ta thường hỏi các công cụ này với",
+            "start": 71.439,
+            "duration": 4.0
+        },
+        {
+            "text": "tần suất rất là dày đặc đó là các cái",
+            "start": 73.439,
+            "duration": 4.36
+        },
+        {
+            "text": "tác vụ có liên quan đến truy xuất và tìm",
+            "start": 75.439,
+            "duration": 4.441
+        },
+        {
+            "text": "kiếm thông tin. Một vài ví dụ điển hình",
+            "start": 77.799,
+            "duration": 3.601
+        },
+        {
+            "text": "của những câu hỏi loại này chúng ta có",
+            "start": 79.88,
+            "duration": 3.199
+        },
+        {
+            "text": "thể liệt kê. Ví dụ như là chúng ta hỏi",
+            "start": 81.4,
+            "duration": 3.96
+        },
+        {
+            "text": "chatt là nhiệt độ ngoài trời hôm nay ở",
+            "start": 83.079,
+            "duration": 4.481
+        },
+        {
+            "text": "Hà Nội là bao nhiêu hay là công thức để",
+            "start": 85.36,
+            "duration": 4.399
+        },
+        {
+            "text": "nấu spaghetti là gì? Hay là hôm nay mà",
+            "start": 87.56,
+            "duration": 3.519
+        },
+        {
+            "text": "tôi muốn mua và chẳng hạn thì tôi nên",
+            "start": 89.759,
+            "duration": 3.441
+        },
+        {
+            "text": "đến tiệm nào để mua hay là lãi suất ngân",
+            "start": 91.079,
+            "duration": 4.641
+        },
+        {
+            "text": "hàng hôm nay là bao nhiêu? Nhìn chung",
+            "start": 93.2,
+            "duration": 4.4
+        },
+        {
+            "text": "đối với các câu hỏi dạng này thì không",
+            "start": 95.72,
+            "duration": 4.0
+        },
+        {
+            "text": "khó để các công cụ A ngày nay có thể trả",
+            "start": 97.6,
+            "duration": 4.44
+        },
+        {
+            "text": "lời người dùng một cách dễ dàng. Tuy",
+            "start": 99.72,
+            "duration": 4.439
+        },
+        {
+            "text": "nhiên, trong một vài trường hợp sẽ có",
+            "start": 102.04,
+            "duration": 4.16
+        },
+        {
+            "text": "một vài các vấn đề nảy sinh. Vấn đề đầu",
+            "start": 104.159,
+            "duration": 5.441
+        },
+        {
+            "text": "tiên có liên quan đến knowledge cutof.",
+            "start": 106.2,
+            "duration": 5.8
+        },
+        {
+            "text": "Knowledge cutof là thời điểm mà dữ liệu",
+            "start": 109.6,
+            "duration": 4.08
+        },
+        {
+            "text": "huấn luyện của một mô hình ngôn ngữ lớn",
+            "start": 112.0,
+            "duration": 3.64
+        },
+        {
+            "text": "dừng lại. Các mô hình ngôn ngữ lớn về",
+            "start": 113.68,
+            "duration": 3.92
+        },
+        {
+            "text": "mặt lý thuyết sẽ không thể trả lời các",
+            "start": 115.64,
+            "duration": 4.399
+        },
+        {
+            "text": "câu hỏi về các sự kiện xảy ra sau cái",
+            "start": 117.6,
+            "duration": 5.119
+        },
+        {
+            "text": "thời điểm knowledge cutof này. Ví dụ",
+            "start": 120.039,
+            "duration": 5.4
+        },
+        {
+            "text": "knowledge cutof của GPT4 là vào khoảng",
+            "start": 122.719,
+            "duration": 5.32
+        },
+        {
+            "text": "tháng 0 năm 2023. Có nghĩa là về mặt kỹ",
+            "start": 125.439,
+            "duration": 5.24
+        },
+        {
+            "text": "thuật thì GPT4 sẽ không có khả năng trả",
+            "start": 128.039,
+            "duration": 4.961
+        },
+        {
+            "text": "lời về các sự kiện xảy ra sau thời điểm",
+            "start": 130.679,
+            "duration": 4.56
+        },
+        {
+            "text": "này. Hoặc là một ví dụ khác cũng rất là",
+            "start": 133.0,
+            "duration": 4.16
+        },
+        {
+            "text": "kinh điển để minh họa cho knowledge",
+            "start": 135.239,
+            "duration": 4.161
+        },
+        {
+            "text": "cutof của các nguồn ngôn ngữ lớn đó là",
+            "start": 137.16,
+            "duration": 5.28
+        },
+        {
+            "text": "ví dụ về chat GBT đời đầu. Phiên bản đầu",
+            "start": 139.4,
+            "duration": 5.6
+        },
+        {
+            "text": "tiên của chat GPT được xây dựng dựa trên",
+            "start": 142.44,
+            "duration": 6.28
+        },
+        {
+            "text": "kiến trúc GPT 3.5 và knowledge cutof của",
+            "start": 145.0,
+            "duration": 8.2
+        },
+        {
+            "text": "GPT 3.5 là tháng 1 năm 2022. Do đó khi",
+            "start": 148.72,
+            "duration": 6.64
+        },
+        {
+            "text": "mà chúng ta hỏi cái công cụ chatt đời",
+            "start": 153.2,
+            "duration": 4.92
+        },
+        {
+            "text": "đầu cái câu hỏi ví dụ như là đội tuyển",
+            "start": 155.36,
+            "duration": 5.48
+        },
+        {
+            "text": "nào vô địch World Cup 2022 thì chatt đời",
+            "start": 158.12,
+            "duration": 4.64
+        },
+        {
+            "text": "đầu nó sẽ không trả lại được tại vì",
+            "start": 160.84,
+            "duration": 4.36
+        },
+        {
+            "text": "World Cup 2022 được diễn ra vào mùa hè",
+            "start": 162.76,
+            "duration": 4.559
+        },
+        {
+            "text": "trong khi non l sc của nó là vào đầu năm",
+            "start": 165.2,
+            "duration": 4.72
+        },
+        {
+            "text": "là vào tháng 1. Hiện nay thì vấn đề có",
+            "start": 167.319,
+            "duration": 4.2
+        },
+        {
+            "text": "liên quan đến knowledge cutof nó không",
+            "start": 169.92,
+            "duration": 3.64
+        },
+        {
+            "text": "còn quá nghiêm trọng như là với các cái",
+            "start": 171.519,
+            "duration": 3.881
+        },
+        {
+            "text": "mô hình ngôn ngữ lớn đời đầu nữa. Tại vì",
+            "start": 173.56,
+            "duration": 3.2
+        },
+        {
+            "text": "hiện nay thì các cái mô hình ngôn ng lớn",
+            "start": 175.4,
+            "duration": 3.559
+        },
+        {
+            "text": "hiện đại đều đã được trang bị những cái",
+            "start": 176.76,
+            "duration": 5.04
+        },
+        {
+            "text": "web browser để nếu mà những cái câu hỏi",
+            "start": 178.959,
+            "duration": 4.84
+        },
+        {
+            "text": "mà người dùng họ hỏi ấy nó không có nằm",
+            "start": 181.8,
+            "duration": 3.32
+        },
+        {
+            "text": "trong dữ liệu huấn luyện của các mô hình",
+            "start": 183.799,
+            "duration": 3.121
+        },
+        {
+            "text": "này thì chúng có thể chủ động chúng tự",
+            "start": 185.12,
+            "duration": 4.679
+        },
+        {
+            "text": "tìm thông tin trên internet. Tuy nhiên,",
+            "start": 186.92,
+            "duration": 4.679
+        },
+        {
+            "text": "knowledge cutof không phải là vấn đề duy",
+            "start": 189.799,
+            "duration": 3.881
+        },
+        {
+            "text": "nhất mà các mô hình ngôn ngữ lớn hay mở",
+            "start": 191.599,
+            "duration": 4.321
+        },
+        {
+            "text": "rộng hơn là các công cụ AI gặp phải",
+            "start": 193.68,
+            "duration": 3.76
+        },
+        {
+            "text": "trong rất nhiều trường hợp, rất nhiều",
+            "start": 195.92,
+            "duration": 3.879
+        },
+        {
+            "text": "tình huống. Nhưng cái thông tin mà chúng",
+            "start": 197.44,
+            "duration": 4.519
+        },
+        {
+            "text": "ta hỏi nó không nằm trong dữ liệu huấn",
+            "start": 199.799,
+            "duration": 4.321
+        },
+        {
+            "text": "luyện mà người ta sử dụng để huấn lệ các",
+            "start": 201.959,
+            "duration": 4.84
+        },
+        {
+            "text": "mỡ lớn. Và đồng thời chúng cũng không",
+            "start": 204.12,
+            "duration": 4.96
+        },
+        {
+            "text": "nằm trong các cái nguồn dữ liệu online",
+            "start": 206.799,
+            "duration": 3.961
+        },
+        {
+            "text": "hay là các cái trang web trên mạng để",
+            "start": 209.08,
+            "duration": 3.76
+        },
+        {
+            "text": "các công cụ AI có thể sử dụng các web",
+            "start": 210.76,
+            "duration": 4.36
+        },
+        {
+            "text": "browser để tìm kiếm những thông tin này.",
+            "start": 212.84,
+            "duration": 4.119
+        },
+        {
+            "text": "Ví dụ các bạn đang làm trong một công ty",
+            "start": 215.12,
+            "duration": 4.199
+        },
+        {
+            "text": "A nào đó. Các bạn bây giờ muốn hỏi chat",
+            "start": 216.959,
+            "duration": 5.28
+        },
+        {
+            "text": "GPT là trong cái hợp đồng mà các bạn ký",
+            "start": 219.319,
+            "duration": 5.2
+        },
+        {
+            "text": "với khách hàng B thì cái điều khoản liên",
+            "start": 222.239,
+            "duration": 4.08
+        },
+        {
+            "text": "quan đến tiền phạt khi mà vi phạm hợp",
+            "start": 224.519,
+            "duration": 3.761
+        },
+        {
+            "text": "đồng là bao nhiêu? Thì nếu các bạn hỏi",
+            "start": 226.319,
+            "duration": 3.721
+        },
+        {
+            "text": "chị thì câu hỏi như vậy thì nó sẽ không",
+            "start": 228.28,
+            "duration": 2.84
+        },
+        {
+            "text": "thể trả lời được tại vì nó không biết",
+            "start": 230.04,
+            "duration": 2.839
+        },
+        {
+            "text": "cái hợp đồng mà công ty của bạn ký với",
+            "start": 231.12,
+            "duration": 3.52
+        },
+        {
+            "text": "công ty B trông nó như thế nào. Thì đây",
+            "start": 232.879,
+            "duration": 3.481
+        },
+        {
+            "text": "chính là một cái ví dụ khi mà các bạn",
+            "start": 234.64,
+            "duration": 3.679
+        },
+        {
+            "text": "hỏi các cái công cụ AI về những cái dữ",
+            "start": 236.36,
+            "duration": 3.959
+        },
+        {
+            "text": "liệu mà nó không nằm trong dữ liệu huấn",
+            "start": 238.319,
+            "duration": 3.401
+        },
+        {
+            "text": "luyện mô hình cũng như là không nằm",
+            "start": 240.319,
+            "duration": 2.84
+        },
+        {
+            "text": "trong những cái dữ liệu mà nó có thể tìm",
+            "start": 241.72,
+            "duration": 3.12
+        },
+        {
+            "text": "trên trên mạng thì nó sẽ không thể trả",
+            "start": 243.159,
+            "duration": 3.121
+        },
+        {
+            "text": "lời một cách chính xác được. Trong những",
+            "start": 244.84,
+            "duration": 3.28
+        },
+        {
+            "text": "trường hợp như thế này, một là các công",
+            "start": 246.28,
+            "duration": 4.44
+        },
+        {
+            "text": "cụ AI như là chatbt nó sẽ không thể nào",
+            "start": 248.12,
+            "duration": 4.759
+        },
+        {
+            "text": "trả lời câu hỏi của các bạn. Và hai là",
+            "start": 250.72,
+            "duration": 3.84
+        },
+        {
+            "text": "trường hợp nó còn tồi tệ hơn là nó sẽ",
+            "start": 252.879,
+            "duration": 3.961
+        },
+        {
+            "text": "trả lời những câu hỏi nghe có vẻ đúng,",
+            "start": 254.56,
+            "duration": 4.72
+        },
+        {
+            "text": "nghe có vẻ hợp lý, nghe có vẻ bùi tai",
+            "start": 256.84,
+            "duration": 4.0
+        },
+        {
+            "text": "nhưng lại không phải thông tin đúng. Và",
+            "start": 259.28,
+            "duration": 2.679
+        },
+        {
+            "text": "cái trường hợp này người ta thường người",
+            "start": 260.84,
+            "duration": 2.799
+        },
+        {
+            "text": "ta hay gọi một cái tuần ngữ đó là",
+            "start": 261.959,
+            "duration": 4.041
+        },
+        {
+            "text": "hallucination hay là ảo giác.",
+            "start": 263.639,
+            "duration": 3.961
+        },
+        {
+            "text": "Hallucination các bạn có thể hiểu một",
+            "start": 266.0,
+            "duration": 3.4
+        },
+        {
+            "text": "cách đơn giản, nó giống như kiểu là",
+            "start": 267.6,
+            "duration": 3.8
+        },
+        {
+            "text": "không biết nhưng mà cứ trả lời bừa vậy.",
+            "start": 269.4,
+            "duration": 4.519
+        },
+        {
+            "text": "Thật ra vẫn có một cách có thể tạo coi",
+            "start": 271.4,
+            "duration": 4.68
+        },
+        {
+            "text": "như là cách để chữa cháy. Ví dụ như là",
+            "start": 273.919,
+            "duration": 4.161
+        },
+        {
+            "text": "khi mà các bạn hỏi chat GPT chẳng hạn",
+            "start": 276.08,
+            "duration": 3.76
+        },
+        {
+            "text": "thì khi mà các bạn đặt câu hỏi các bạn",
+            "start": 278.08,
+            "duration": 3.959
+        },
+        {
+            "text": "cũng sẽ đồng thời đính kèm một vài những",
+            "start": 279.84,
+            "duration": 3.88
+        },
+        {
+            "text": "cái file tài liệu, một vài những cái",
+            "start": 282.039,
+            "duration": 3.6
+        },
+        {
+            "text": "file có chứa thông tin liên quan và các",
+            "start": 283.72,
+            "duration": 4.199
+        },
+        {
+            "text": "bạn sẽ yêu cầu cho CBT là hãy trả lời",
+            "start": 285.639,
+            "duration": 4.361
+        },
+        {
+            "text": "câu hỏi của tôi dựa trên tài liệu mà tôi",
+            "start": 287.919,
+            "duration": 4.881
+        },
+        {
+            "text": "cung cấp. Tuy nhiên cách này thì không",
+            "start": 290.0,
+            "duration": 5.0
+        },
+        {
+            "text": "phải lúc nào cũng có thể áp dụng được.",
+            "start": 292.8,
+            "duration": 4.32
+        },
+        {
+            "text": "Cách tiếp cận này thứ nhất là rất bất",
+            "start": 295.0,
+            "duration": 3.96
+        },
+        {
+            "text": "tiện tại vì cứ mỗi khi chúng ta hỏi một",
+            "start": 297.12,
+            "duration": 3.84
+        },
+        {
+            "text": "cái gì đấy chúng ta lại phải kè kè chúng",
+            "start": 298.96,
+            "duration": 3.64
+        },
+        {
+            "text": "ta đính kèm những cái file tài liệu liên",
+            "start": 300.96,
+            "duration": 4.959
+        },
+        {
+            "text": "quan để chatt nó tìm. Thứ hai là không",
+            "start": 302.6,
+            "duration": 5.4
+        },
+        {
+            "text": "phải lúc nào người hỏi họ cũng có những",
+            "start": 305.919,
+            "duration": 3.481
+        },
+        {
+            "text": "cái file tài liệu có liên quan ở bên",
+            "start": 308.0,
+            "duration": 3.039
+        },
+        {
+            "text": "cạnh. Tại vì nhiều khi ví dụ như là",
+            "start": 309.4,
+            "duration": 3.639
+        },
+        {
+            "text": "chúng ta là một nhân viên trong một công",
+            "start": 311.039,
+            "duration": 3.521
+        },
+        {
+            "text": "ty chẳng hạn, chúng ta muốn hỏi một cái",
+            "start": 313.039,
+            "duration": 3.16
+        },
+        {
+            "text": "gì đấy về thông tin nội bộ nhưng mà",
+            "start": 314.56,
+            "duration": 2.84
+        },
+        {
+            "text": "chúng ta cũng không có cái tài liệu có",
+            "start": 316.199,
+            "duration": 3.72
+        },
+        {
+            "text": "liên quan. Chúng ta chỉ biết là có cái",
+            "start": 317.4,
+            "duration": 4.16
+        },
+        {
+            "text": "tài liệu đó ở đâu đấy thế nhưng mà chúng",
+            "start": 319.919,
+            "duration": 3.161
+        },
+        {
+            "text": "ta không biết là cụ thể nó ở đâu nên là",
+            "start": 321.56,
+            "duration": 2.919
+        },
+        {
+            "text": "chúng ta cũng sẽ không có cái để mà định",
+            "start": 323.08,
+            "duration": 3.76
+        },
+        {
+            "text": "kèm cùng khi chúng ta đặt câu hỏi. Và kể",
+            "start": 324.479,
+            "duration": 4.081
+        },
+        {
+            "text": "cả trong trường hợp cuối cùng cứ coi như",
+            "start": 326.84,
+            "duration": 3.16
+        },
+        {
+            "text": "là các bạn có đầy đủ các cái tài liệu có",
+            "start": 328.56,
+            "duration": 3.4
+        },
+        {
+            "text": "liên quan với cái câu hỏi của bạn đi.",
+            "start": 330.0,
+            "duration": 3.479
+        },
+        {
+            "text": "Thế nhưng mà khi mà các bạn dùng chatt",
+            "start": 331.96,
+            "duration": 3.959
+        },
+        {
+            "text": "các bạn có thể để ý là không chỉ chat TV",
+            "start": 333.479,
+            "duration": 3.961
+        },
+        {
+            "text": "đâu mà các cái công cụ khác nó cũng thế.",
+            "start": 335.919,
+            "duration": 3.201
+        },
+        {
+            "text": "người ta sẽ có những cái giới hạn về số",
+            "start": 337.44,
+            "duration": 2.96
+        },
+        {
+            "text": "lượng file các bạn có thể đính kèm trong",
+            "start": 339.12,
+            "duration": 3.28
+        },
+        {
+            "text": "một lượt các bạn hỏi. Ví dụ là thường là",
+            "start": 340.4,
+            "duration": 3.72
+        },
+        {
+            "text": "các bạn chỉ được đính kèm 10 file thôi.",
+            "start": 342.4,
+            "duration": 3.079
+        },
+        {
+            "text": "Nên nếu mà khi mà những cái tài liệu",
+            "start": 344.12,
+            "duration": 2.799
+        },
+        {
+            "text": "liên quan nó nhiều hơn 10 file chẳng hạn",
+            "start": 345.479,
+            "duration": 2.84
+        },
+        {
+            "text": "thì các bạn có thể các bạn sẽ phải chia",
+            "start": 346.919,
+            "duration": 2.961
+        },
+        {
+            "text": "nhỏ thành nhiều lần và nó sẽ khiến cho",
+            "start": 348.319,
+            "duration": 3.041
+        },
+        {
+            "text": "cái trải nghiệm các bạn dùng cái công cụ",
+            "start": 349.88,
+            "duration": 3.879
+        },
+        {
+            "text": "E này nó trở nên tồi hơn rất nhiều. và",
+            "start": 351.36,
+            "duration": 5.2
+        },
+        {
+            "text": "receiver almond generation hay rag chính",
+            "start": 353.759,
+            "duration": 4.601
+        },
+        {
+            "text": "là kỹ thuật được ra đời để giải quyết",
+            "start": 356.56,
+            "duration": 3.52
+        },
+        {
+            "text": "những tình huống như vậy. Các bạn có thể",
+            "start": 358.36,
+            "duration": 4.36
+        },
+        {
+            "text": "hiểu cách đơn giản như thế này. Trong R",
+            "start": 360.08,
+            "duration": 4.52
+        },
+        {
+            "text": "trước khi mà người dùng bắt đầu sử dụng",
+            "start": 362.72,
+            "duration": 3.96
+        },
+        {
+            "text": "chatbot của chúng ta thì chúng ta sẽ đưa",
+            "start": 364.6,
+            "duration": 4.24
+        },
+        {
+            "text": "vào trong chatbot một cái lượng dữ liệu",
+            "start": 366.68,
+            "duration": 4.32
+        },
+        {
+            "text": "riêng tư hay người ta còn gọi là private",
+            "start": 368.84,
+            "duration": 4.44
+        },
+        {
+            "text": "data để cho con chatbot của chúng ta nó",
+            "start": 371.0,
+            "duration": 4.479
+        },
+        {
+            "text": "sẽ làm quen trước với lượng dữ liệu này.",
+            "start": 373.28,
+            "duration": 4.68
+        },
+        {
+            "text": "Rồi sau này khi mà người dùng họ sử dụng",
+            "start": 375.479,
+            "duration": 4.241
+        },
+        {
+            "text": "và họ hỏi chatbot của chúng ta các cái",
+            "start": 377.96,
+            "duration": 3.44
+        },
+        {
+            "text": "câu hỏi khác nhau thì con chatbot của",
+            "start": 379.72,
+            "duration": 4.28
+        },
+        {
+            "text": "chúng ta nó sẽ chỉ tìm câu trả lời từ",
+            "start": 381.4,
+            "duration": 4.4
+        },
+        {
+            "text": "cái rượu riêng tư mà chúng ta đã đạp vào",
+            "start": 384.0,
+            "duration": 3.72
+        },
+        {
+            "text": "từ trước mà thôi chứ nó không có tìm câu",
+            "start": 385.8,
+            "duration": 3.519
+        },
+        {
+            "text": "trả lời trên internet hay là từ những",
+            "start": 387.72,
+            "duration": 3.64
+        },
+        {
+            "text": "cái nguồn dữ liệu bên ngoài. Mình sẽ nói",
+            "start": 389.319,
+            "duration": 4.121
+        },
+        {
+            "text": "thêm một chút về các dữ liệu riêng tư",
+            "start": 391.36,
+            "duration": 5.239
+        },
+        {
+            "text": "hay là private data này. Ví dụ các bạn",
+            "start": 393.44,
+            "duration": 5.319
+        },
+        {
+            "text": "đang xây dựng một tr AI dành cho một cái",
+            "start": 396.599,
+            "duration": 3.88
+        },
+        {
+            "text": "bệnh viện A nào đây chẳng hạn thì những",
+            "start": 398.759,
+            "duration": 3.361
+        },
+        {
+            "text": "cái rượu riêng tư này có thể là những",
+            "start": 400.479,
+            "duration": 4.0
+        },
+        {
+            "text": "cái hồ sơ bệnh án về các bệnh nhân đang",
+            "start": 402.12,
+            "duration": 4.199
+        },
+        {
+            "text": "điều trị ở trong bệnh viện A này. hoặc",
+            "start": 404.479,
+            "duration": 3.201
+        },
+        {
+            "text": "là nếu các bạn đang xây dựng một chatbot",
+            "start": 406.319,
+            "duration": 3.801
+        },
+        {
+            "text": "AI dành cho một cái ngân hàng B nào đấy",
+            "start": 407.68,
+            "duration": 4.72
+        },
+        {
+            "text": "thì dệu riêng tư trong trường hợp này có",
+            "start": 410.12,
+            "duration": 4.04
+        },
+        {
+            "text": "thể là những cái thông tin có liên quan",
+            "start": 412.4,
+            "duration": 4.359
+        },
+        {
+            "text": "đến khách hàng bao gồm là hồ sơ hay là",
+            "start": 414.16,
+            "duration": 4.96
+        },
+        {
+            "text": "tài khoản của họ hoặc là trường hợp tổng",
+            "start": 416.759,
+            "duration": 4.321
+        },
+        {
+            "text": "quát hơn giả sử các bạn đang định xây",
+            "start": 419.12,
+            "duration": 3.759
+        },
+        {
+            "text": "dựng một chaot AI dành cho một doanh",
+            "start": 421.08,
+            "duration": 3.959
+        },
+        {
+            "text": "nghiệp hay là công ty C nào đó thì dữ",
+            "start": 422.879,
+            "duration": 3.88
+        },
+        {
+            "text": "liệu riêng tư mà các bạn cần phải đưa",
+            "start": 425.039,
+            "duration": 3.521
+        },
+        {
+            "text": "vào trong các con jaot này có thể là",
+            "start": 426.759,
+            "duration": 3.401
+        },
+        {
+            "text": "những cái dữ liệu có liên quan đến khách",
+            "start": 428.56,
+            "duration": 3.8
+        },
+        {
+            "text": "hàng hoặc là chính nhân viên của công ty",
+            "start": 430.16,
+            "duration": 4.12
+        },
+        {
+            "text": "hay là doanh nghiệp này các bạn có thể",
+            "start": 432.36,
+            "duration": 3.64
+        },
+        {
+            "text": "dễ dàng thấy được điểm chung của các cái",
+            "start": 434.28,
+            "duration": 3.12
+        },
+        {
+            "text": "dữ liệu riêng thư trong tất cả những",
+            "start": 436.0,
+            "duration": 3.16
+        },
+        {
+            "text": "trường hợp vừa rồi đúng không? Đây đều",
+            "start": 437.4,
+            "duration": 3.4
+        },
+        {
+            "text": "là những cái dữ liệu mà các bạn chắc",
+            "start": 439.16,
+            "duration": 3.319
+        },
+        {
+            "text": "chắn không bao giờ có thể tìm được trên",
+            "start": 440.8,
+            "duration": 3.36
+        },
+        {
+            "text": "internet hoặc là từ bất kỳ một cái nguồn",
+            "start": 442.479,
+            "duration": 3.521
+        },
+        {
+            "text": "rượu bên ngoài nào và chắc chắn là cái",
+            "start": 444.16,
+            "duration": 3.759
+        },
+        {
+            "text": "công ty, doanh nghiệp, bệnh viện hay là",
+            "start": 446.0,
+            "duration": 3.52
+        },
+        {
+            "text": "ngân hàng của chúng ta cũng sẽ không",
+            "start": 447.919,
+            "duration": 3.521
+        },
+        {
+            "text": "được phép để lộ những cái rượu này ra",
+            "start": 449.52,
+            "duration": 4.44
+        },
+        {
+            "text": "bên ngoài. Ok. Sau khi chúng ta đã nói",
+            "start": 451.44,
+            "duration": 5.36
+        },
+        {
+            "text": "về lý do vì sao RAC lại tồn tại, vì sao",
+            "start": 453.96,
+            "duration": 3.959
+        },
+        {
+            "text": "chúng ta lại cần những kỹ thuật như là",
+            "start": 456.8,
+            "duration": 4.959
+        },
+        {
+            "text": "RAC thì bây giức",
+            "start": 457.919,
+            "duration": 3.84
+        },
+        {
+            "text": "mà nó vận hành ra sao. Như các bạn có",
+            "start": 463.039,
+            "duration": 4.481
+        },
+        {
+            "text": "thể nhìn thấy đây chính là hình minh họa",
+            "start": 465.159,
+            "duration": 4.201
+        },
+        {
+            "text": "quá trình hoạt động của RAC cả dưới góc",
+            "start": 467.52,
+            "duration": 3.6
+        },
+        {
+            "text": "nhìn của người dùng cũng như là góc nhìn",
+            "start": 469.36,
+            "duration": 3.72
+        },
+        {
+            "text": "của người xây dựng hệ thống. Chúng ta sẽ",
+            "start": 471.12,
+            "duration": 3.44
+        },
+        {
+            "text": "tập trung vào hình nhỏ ở phía trên",
+            "start": 473.08,
+            "duration": 4.119
+        },
+        {
+            "text": "trước. Đây chính là cái luồng hoạt động",
+            "start": 474.56,
+            "duration": 5.12
+        },
+        {
+            "text": "của RAP dưới góc nhìn của người dùng.",
+            "start": 477.199,
+            "duration": 4.201
+        },
+        {
+            "text": "Đầu tiên người dùng sẽ đặt ra một câu",
+            "start": 479.68,
+            "duration": 4.84
+        },
+        {
+            "text": "hỏi. Ví dụ đây là một con chatbot được",
+            "start": 481.4,
+            "duration": 4.56
+        },
+        {
+            "text": "xây dựng cho một trường đại học chẳng",
+            "start": 484.52,
+            "duration": 2.84
+        },
+        {
+            "text": "hạn thì chúng ta có thể hỏi con chatbot",
+            "start": 485.96,
+            "duration": 3.84
+        },
+        {
+            "text": "này một câu như là hãy liệt kê tất cả",
+            "start": 487.36,
+            "duration": 4.2
+        },
+        {
+            "text": "những cái bài báo nghiên cứu trong 1 năm",
+            "start": 489.8,
+            "duration": 4.6
+        },
+        {
+            "text": "vừa qua về chủ đề chuyển đổi số. Tất",
+            "start": 491.56,
+            "duration": 4.639
+        },
+        {
+            "text": "nhiên ở đây chúng ta đều hiểu rằng chúng",
+            "start": 494.4,
+            "duration": 3.44
+        },
+        {
+            "text": "ta đang muốn tìm những cái bài báo về",
+            "start": 496.199,
+            "duration": 3.44
+        },
+        {
+            "text": "chủ đề chuyển đổi số của các cái giảng",
+            "start": 497.84,
+            "duration": 3.24
+        },
+        {
+            "text": "viên trong trường chứ không phải chúng",
+            "start": 499.639,
+            "duration": 2.761
+        },
+        {
+            "text": "ta đang muốn tìm chung chung trên mạng",
+            "start": 501.08,
+            "duration": 3.16
+        },
+        {
+            "text": "internet. Sau khi nhận được câu hỏi như",
+            "start": 502.4,
+            "duration": 4.04
+        },
+        {
+            "text": "vậy thì con chatbot nó sẽ tìm kiếm những",
+            "start": 504.24,
+            "duration": 4.48
+        },
+        {
+            "text": "cái thông tin có liên quan đến câu hỏi",
+            "start": 506.44,
+            "duration": 4.68
+        },
+        {
+            "text": "này dựa trên cái nguồn dữ liệu riêng hay",
+            "start": 508.72,
+            "duration": 4.48
+        },
+        {
+            "text": "là private data mà nó được nhận từ",
+            "start": 511.12,
+            "duration": 4.2
+        },
+        {
+            "text": "trước. Sau khi đã tìm được những thông",
+            "start": 513.2,
+            "duration": 4.12
+        },
+        {
+            "text": "tin có liên quan đến câu hỏi rồi thì",
+            "start": 515.32,
+            "duration": 3.8
+        },
+        {
+            "text": "những thông tin này sẽ được sử dụng như",
+            "start": 517.32,
+            "duration": 4.24
+        },
+        {
+            "text": "là ngữ cảnh để chatbot có thể dựa vào đó",
+            "start": 519.12,
+            "duration": 3.799
+        },
+        {
+            "text": "để trả lời câu hỏi ban đầu của người",
+            "start": 521.56,
+            "duration": 4.12
+        },
+        {
+            "text": "dùng. Ví dụ vẫn với câu hỏi vừa rồi,",
+            "start": 522.919,
+            "duration": 5.161
+        },
+        {
+            "text": "Conot nó tìm được ba cái mẩu thông tin",
+            "start": 525.68,
+            "duration": 4.76
+        },
+        {
+            "text": "có liên quan đến câu hỏi này là giảng",
+            "start": 528.08,
+            "duration": 5.319
+        },
+        {
+            "text": "viên A có bài báo X, giảng viên B có bài",
+            "start": 530.44,
+            "duration": 6.44
+        },
+        {
+            "text": "báo Y, giảng viên C có bài báo Z. Và đây",
+            "start": 533.399,
+            "duration": 5.281
+        },
+        {
+            "text": "là ba cái thông tin mà có liên quan đến",
+            "start": 536.88,
+            "duration": 3.399
+        },
+        {
+            "text": "cái câu hỏi ban đầu của người dùng. Thì",
+            "start": 538.68,
+            "duration": 3.04
+        },
+        {
+            "text": "những cái thông tin này sẽ được dùng để",
+            "start": 540.279,
+            "duration": 3.761
+        },
+        {
+            "text": "làm ngữ cảnh. Có nghĩa là khi mà con chó",
+            "start": 541.72,
+            "duration": 4.0
+        },
+        {
+            "text": "boss nó trả lời câu hỏi của người dùng,",
+            "start": 544.04,
+            "duration": 3.919
+        },
+        {
+            "text": "nó sẽ chỉ có thể tìm câu trả lời từ",
+            "start": 545.72,
+            "duration": 3.44
+        },
+        {
+            "text": "những cái ngữ cảnh mà chúng ta cung cấp",
+            "start": 547.959,
+            "duration": 3.681
+        },
+        {
+            "text": "này mà thôi. Tìm câu trả lời ở đây không",
+            "start": 549.16,
+            "duration": 4.64
+        },
+        {
+            "text": "chỉ đơn giản là tìm thông tin từ một cái",
+            "start": 551.64,
+            "duration": 4.36
+        },
+        {
+            "text": "đoạn text mà nó còn bao gồm là suy luận,",
+            "start": 553.8,
+            "duration": 3.88
+        },
+        {
+            "text": "tổng hợp, kết hợp từ nhiều nguồn thông",
+            "start": 556.0,
+            "duration": 3.2
+        },
+        {
+            "text": "tin khác nhau. Thì cái phần này ở phần",
+            "start": 557.68,
+            "duration": 4.24
+        },
+        {
+            "text": "sau mình sẽ nói chi tiết hơn. Cuối cùng",
+            "start": 559.2,
+            "duration": 5.319
+        },
+        {
+            "text": "câu trả lời được tạo ra dựa trên câu hỏi",
+            "start": 561.92,
+            "duration": 3.919
+        },
+        {
+            "text": "cũng như là những cái ngữ cảnh mà chúng",
+            "start": 564.519,
+            "duration": 3.081
+        },
+        {
+            "text": "ta tìm ra được trong dữ liệu riêng sẽ",
+            "start": 565.839,
+            "duration": 4.44
+        },
+        {
+            "text": "được tổng hợp và trả lại cho người dùng.",
+            "start": 567.6,
+            "duration": 4.4
+        },
+        {
+            "text": "Vừa rồi là luồng hoạt động tổng quát của",
+            "start": 570.279,
+            "duration": 4.321
+        },
+        {
+            "text": "RAP dưới góc nhìn của người dùng. Bây",
+            "start": 572.0,
+            "duration": 4.04
+        },
+        {
+            "text": "giờ chúng ta sẽ đi sâu chi tiết hơn một",
+            "start": 574.6,
+            "duration": 3.16
+        },
+        {
+            "text": "chút. Chúng ta sẽ nhìn vào cái luồng",
+            "start": 576.04,
+            "duration": 3.44
+        },
+        {
+            "text": "hoạt động này nhưng dưới góc nhìn của",
+            "start": 577.76,
+            "duration": 3.88
+        },
+        {
+            "text": "người xây dựng hệ thống. Dưới góc nhìn",
+            "start": 579.48,
+            "duration": 4.44
+        },
+        {
+            "text": "này, trước khi mà người dùng đặt ra",
+            "start": 581.64,
+            "duration": 4.16
+        },
+        {
+            "text": "những cái câu hỏi cho chatbot thì chúng",
+            "start": 583.92,
+            "duration": 3.64
+        },
+        {
+            "text": "ta đã phải có một cái bước chúng ta xử",
+            "start": 585.8,
+            "duration": 3.44
+        },
+        {
+            "text": "lý trước những cái dữ liệu riêng của",
+            "start": 587.56,
+            "duration": 3.6
+        },
+        {
+            "text": "chúng ta để chatbot nó có những cái kiến",
+            "start": 589.24,
+            "duration": 3.96
+        },
+        {
+            "text": "thức về những cái dữ liệu này. Dữ liệu",
+            "start": 591.16,
+            "duration": 3.799
+        },
+        {
+            "text": "riêng này chúng ta sẽ gọi nó với một cái",
+            "start": 593.2,
+            "duration": 4.72
+        },
+        {
+            "text": "tên đó là knowledge base. Cái knowledge",
+            "start": 594.959,
+            "duration": 4.961
+        },
+        {
+            "text": "base này sẽ là những cái dữ liệu được",
+            "start": 597.92,
+            "duration": 4.599
+        },
+        {
+            "text": "tổng hợp được thu thập từ rất nhiều",
+            "start": 599.92,
+            "duration": 4.88
+        },
+        {
+            "text": "nguồn khác nhau. Và về mặt lý thuyết",
+            "start": 602.519,
+            "duration": 4.081
+        },
+        {
+            "text": "chúng có thể có rất nhiều định dạng khác",
+            "start": 604.8,
+            "duration": 3.64
+        },
+        {
+            "text": "nhau. Ví dụ chúng có thể là những cái",
+            "start": 606.6,
+            "duration": 3.76
+        },
+        {
+            "text": "file text, chúng có thể là những file",
+            "start": 608.44,
+            "duration": 4.88
+        },
+        {
+            "text": "ảnh, file video, file audio hoặc thậm",
+            "start": 610.36,
+            "duration": 4.8
+        },
+        {
+            "text": "chí là những cái file code. Để cho dễ",
+            "start": 613.32,
+            "duration": 3.639
+        },
+        {
+            "text": "dàng và thuận tiện hơn trong việc xử lý",
+            "start": 615.16,
+            "duration": 3.799
+        },
+        {
+            "text": "ở bước sau thì thường người ta sẽ đặt",
+            "start": 616.959,
+            "duration": 4.401
+        },
+        {
+            "text": "tất cả những rượu này vào cùng một nơi.",
+            "start": 618.959,
+            "duration": 4.081
+        },
+        {
+            "text": "Có một điểm mà chúng ta cần phải chú ý",
+            "start": 621.36,
+            "duration": 3.479
+        },
+        {
+            "text": "đó là những cái rượu này chúng không",
+            "start": 623.04,
+            "duration": 3.96
+        },
+        {
+            "text": "những đa dạng về mặt nguồn gốc xuất xứ,",
+            "start": 624.839,
+            "duration": 4.161
+        },
+        {
+            "text": "không những đa dạng về mặt định dạng mà",
+            "start": 627.0,
+            "duration": 4.399
+        },
+        {
+            "text": "chúng nó còn đa dạng về mặt độ dài nữa.",
+            "start": 629.0,
+            "duration": 3.92
+        },
+        {
+            "text": "Có nghĩa là có thể có những cái tài liệu",
+            "start": 631.399,
+            "duration": 3.361
+        },
+        {
+            "text": "nó rất ngắn nhưng cũng có những tài liệu",
+            "start": 632.92,
+            "duration": 4.359
+        },
+        {
+            "text": "nó rất dài. Ví dụ chúng ta có thể có",
+            "start": 634.76,
+            "duration": 4.16
+        },
+        {
+            "text": "những cái tài liệu nó rất là ngắn như là",
+            "start": 637.279,
+            "duration": 3.841
+        },
+        {
+            "text": "hóa đơn chẳng hạn nhưng đồng thời chúng",
+            "start": 638.92,
+            "duration": 3.28
+        },
+        {
+            "text": "ta cũng sẽ có những cái tài liệu rất là",
+            "start": 641.12,
+            "duration": 2.8
+        },
+        {
+            "text": "dài. Ví dụ như là chúng ta có những cái",
+            "start": 642.2,
+            "duration": 3.24
+        },
+        {
+            "text": "bài bám nghiên cứu khoa học thì việc nó",
+            "start": 643.92,
+            "duration": 2.88
+        },
+        {
+            "text": "dài hàng trăm trang là chuyện hết sức",
+            "start": 645.44,
+            "duration": 2.88
+        },
+        {
+            "text": "bình thường. Với những rượu liệu ngắn",
+            "start": 646.8,
+            "duration": 3.64
+        },
+        {
+            "text": "thì không sao nhưng với những rượu dài",
+            "start": 648.32,
+            "duration": 3.44
+        },
+        {
+            "text": "nếu chúng ta cứ để nguyên một cục như",
+            "start": 650.44,
+            "duration": 3.44
+        },
+        {
+            "text": "vậy chúng ta đưa vào con chatbot mà cụ",
+            "start": 651.76,
+            "duration": 3.44
+        },
+        {
+            "text": "thể hơn là chúng ta đưa vào cái mô hình",
+            "start": 653.88,
+            "duration": 3.079
+        },
+        {
+            "text": "ngôn ngữ lớn đứng đằng sau con chatbot",
+            "start": 655.2,
+            "duration": 3.68
+        },
+        {
+            "text": "thì sẽ rất là khó cho cái mô hình này nó",
+            "start": 656.959,
+            "duration": 4.401
+        },
+        {
+            "text": "có thể lọc được những cái thông tin chi",
+            "start": 658.88,
+            "duration": 3.959
+        },
+        {
+            "text": "tiết ở bên trong tài liệu. Tại vì nó",
+            "start": 661.36,
+            "duration": 2.76
+        },
+        {
+            "text": "cũng giống như con người chúng ta vậy.",
+            "start": 662.839,
+            "duration": 2.56
+        },
+        {
+            "text": "Nếu chúng ta phải đọc một cái lượng rượu",
+            "start": 664.12,
+            "duration": 2.839
+        },
+        {
+            "text": "nó quá là lớn thì chúng ta sẽ có khả",
+            "start": 665.399,
+            "duration": 3.801
+        },
+        {
+            "text": "năng cao, chúng ta sẽ bị bỏ lỡ những cái",
+            "start": 666.959,
+            "duration": 4.401
+        },
+        {
+            "text": "chi tiết ở bên trong cái tài liệu này.",
+            "start": 669.2,
+            "duration": 4.759
+        },
+        {
+            "text": "Do đó, để dễ dàng và thuận tiện hơn",
+            "start": 671.36,
+            "duration": 4.719
+        },
+        {
+            "text": "trong quá trình xử lý cũng như là truy",
+            "start": 673.959,
+            "duration": 3.641
+        },
+        {
+            "text": "xuất thông tin sau này thì chúng ta",
+            "start": 676.079,
+            "duration": 3.521
+        },
+        {
+            "text": "thường sẽ có một cái bước đầu tiên gọi",
+            "start": 677.6,
+            "duration": 4.56
+        },
+        {
+            "text": "là chunking. Ở bước chunking này thì",
+            "start": 679.6,
+            "duration": 4.56
+        },
+        {
+            "text": "chúng ta sẽ chia nhỏ các cái tài liệu",
+            "start": 682.16,
+            "duration": 3.72
+        },
+        {
+            "text": "chúng ta thành những cái đoạn nhỏ hơn",
+            "start": 684.16,
+            "duration": 4.04
+        },
+        {
+            "text": "được gọi là các trunks. Một ví dụ đơn",
+            "start": 685.88,
+            "duration": 5.0
+        },
+        {
+            "text": "giản giả sử các bạn có một cái file PDF",
+            "start": 688.2,
+            "duration": 4.68
+        },
+        {
+            "text": "dài 100 trang chẳng hạn thì qua cái bước",
+            "start": 690.88,
+            "duration": 3.68
+        },
+        {
+            "text": "trang kênh này thì cái file PDF này nó",
+            "start": 692.88,
+            "duration": 3.72
+        },
+        {
+            "text": "sẽ được chia nhỏ ra thành 100 cái file",
+            "start": 694.56,
+            "duration": 3.68
+        },
+        {
+            "text": "con. Mỗi file con có độ dài là một",
+            "start": 696.6,
+            "duration": 4.4
+        },
+        {
+            "text": "trang. Với con người chúng ta đọc một",
+            "start": 698.24,
+            "duration": 5.279
+        },
+        {
+            "text": "cái tài liệu dài một trang A4 rõ ràng dễ",
+            "start": 701.0,
+            "duration": 4.519
+        },
+        {
+            "text": "hơn rất nhiều so với đọc những tài liệu",
+            "start": 703.519,
+            "duration": 4.481
+        },
+        {
+            "text": "10 trang hay là 100 trang. Thì dưới góc",
+            "start": 705.519,
+            "duration": 4.201
+        },
+        {
+            "text": "nhìn của chatbot nói chung hay là các",
+            "start": 708.0,
+            "duration": 3.519
+        },
+        {
+            "text": "nguồn ngôn ngữ lớn nói riêng cũng vậy.",
+            "start": 709.72,
+            "duration": 4.239
+        },
+        {
+            "text": "Tiêu hóa nội dung của những cái trang",
+            "start": 711.519,
+            "duration": 4.641
+        },
+        {
+            "text": "này rõ ràng nó sẽ dễ dàng hơn rất nhiều",
+            "start": 713.959,
+            "duration": 4.081
+        },
+        {
+            "text": "so với tiêu hóa nội dung của những cái",
+            "start": 716.16,
+            "duration": 4.52
+        },
+        {
+            "text": "diệu gốc ban đầu. Nói về tranging thì có",
+            "start": 718.04,
+            "duration": 3.799
+        },
+        {
+            "text": "rất nhiều các kỹ thuật trang king khác",
+            "start": 720.68,
+            "duration": 4.0
+        },
+        {
+            "text": "nhau từ đơn giản đến phức tạp.",
+            "start": 721.839,
+            "duration": 4.201
+        },
+        {
+            "text": "Trong trường hợp đơn giản nhất thì người",
+            "start": 724.68,
+            "duration": 3.08
+        },
+        {
+            "text": "ta sẽ thực hiện trang king dựa theo độ",
+            "start": 726.04,
+            "duration": 4.32
+        },
+        {
+            "text": "dài mà cụ thể ở đây thường sẽ là số",
+            "start": 727.76,
+            "duration": 4.96
+        },
+        {
+            "text": "lượng của các token. Ví dụ người ta có",
+            "start": 730.36,
+            "duration": 4.599
+        },
+        {
+            "text": "thể định nghĩa một trang có độ dài tối",
+            "start": 732.72,
+            "duration": 6.2
+        },
+        {
+            "text": "đa là 1000 token. Token là đơn vị nguyên",
+            "start": 734.959,
+            "duration": 6.401
+        },
+        {
+            "text": "tử cấu tạo nên dữ liệu. Đơn vị nguyên tử",
+            "start": 738.92,
+            "duration": 3.64
+        },
+        {
+            "text": "có nghĩa là chúng ta sẽ không thể nào",
+            "start": 741.36,
+            "duration": 3.279
+        },
+        {
+            "text": "chúng ta chia nhỏ token hơn được nữa.",
+            "start": 742.56,
+            "duration": 4.12
+        },
+        {
+            "text": "Token nó là đơn vị bé nhất rồi. Trong",
+            "start": 744.639,
+            "duration": 3.521
+        },
+        {
+            "text": "trường hợp phổ biến nhất của dữ liệu đó",
+            "start": 746.68,
+            "duration": 3.8
+        },
+        {
+            "text": "là dữ liệu dạng văn bản thì một token nó",
+            "start": 748.16,
+            "duration": 4.6
+        },
+        {
+            "text": "có thể là một từ hoặc nó có thể là một",
+            "start": 750.48,
+            "duration": 5.039
+        },
+        {
+            "text": "phần của một từ. Tuy nhiên trong các tài",
+            "start": 752.76,
+            "duration": 4.68
+        },
+        {
+            "text": "liệu giảng dạy và học tập về AI nói",
+            "start": 755.519,
+            "duration": 3.281
+        },
+        {
+            "text": "chung cũng như là các mô hình ngôn ngữ",
+            "start": 757.44,
+            "duration": 3.88
+        },
+        {
+            "text": "lớn nói riêng thì để cho trực quan và để",
+            "start": 758.8,
+            "duration": 4.479
+        },
+        {
+            "text": "cho người dùng họ dễ hiểu thì người ta",
+            "start": 761.32,
+            "duration": 4.4
+        },
+        {
+            "text": "thường hay coi một token tương đương với",
+            "start": 763.279,
+            "duration": 4.321
+        },
+        {
+            "text": "một từ. Nhưng các bạn chú ý nhá điều này",
+            "start": 765.72,
+            "duration": 4.2
+        },
+        {
+            "text": "nó là không đúng. Tocen nó có thể là một",
+            "start": 767.6,
+            "duration": 4.72
+        },
+        {
+            "text": "từ, nó có thể là đoạn đầu của một từ, nó",
+            "start": 769.92,
+            "duration": 4.159
+        },
+        {
+            "text": "có thể là đoạn cuối của một từ. Đấy,",
+            "start": 772.32,
+            "duration": 3.879
+        },
+        {
+            "text": "nhìn chung thì token nó sẽ không bao giờ",
+            "start": 774.079,
+            "duration": 4.281
+        },
+        {
+            "text": "nó tương đương với một từ cả. Ngoài ra",
+            "start": 776.199,
+            "duration": 3.561
+        },
+        {
+            "text": "thì người ta cũng có thể thực hiện trang",
+            "start": 778.36,
+            "duration": 4.599
+        },
+        {
+            "text": "king dựa theo câu hoặc là dựa theo đoạn.",
+            "start": 779.76,
+            "duration": 5.04
+        },
+        {
+            "text": "Tuy nhiên thì tất cả những cách này dù",
+            "start": 782.959,
+            "duration": 3.801
+        },
+        {
+            "text": "là trang kingh dựa theo token, dựa đo",
+            "start": 784.8,
+            "duration": 3.599
+        },
+        {
+            "text": "câu hay là dựa đo đoạn chúng đều có một",
+            "start": 786.76,
+            "duration": 4.0
+        },
+        {
+            "text": "cái nhược điểm chung đó là có thể nó sẽ",
+            "start": 788.399,
+            "duration": 4.601
+        },
+        {
+            "text": "khiến cho cái ý nghĩa của một cái đoạn",
+            "start": 790.76,
+            "duration": 4.519
+        },
+        {
+            "text": "trăng nó đang tiếp diễn thì nó bị ngắt",
+            "start": 793.0,
+            "duration": 4.16
+        },
+        {
+            "text": "tại vì nó đã đến cái giới hạn về độ dài",
+            "start": 795.279,
+            "duration": 3.441
+        },
+        {
+            "text": "của nó rồi. Có một phương pháp trang",
+            "start": 797.16,
+            "duration": 3.2
+        },
+        {
+            "text": "kinh nữa kết hợp các cái phương pháp",
+            "start": 798.72,
+            "duration": 3.2
+        },
+        {
+            "text": "trang kinh mà mình vừa mới kể ở trên",
+            "start": 800.36,
+            "duration": 3.76
+        },
+        {
+            "text": "người ta gọi là hyc trang king. Tức là",
+            "start": 801.92,
+            "duration": 3.84
+        },
+        {
+            "text": "người ta sẽ kết hợp trang kinh ở nhiều",
+            "start": 804.12,
+            "duration": 4.32
+        },
+        {
+            "text": "mức độ, nhiều level với nhau. Ví dụ như",
+            "start": 805.76,
+            "duration": 4.879
+        },
+        {
+            "text": "là kết hợp giữa trang kinh dựa theo khổ",
+            "start": 808.44,
+            "duration": 3.959
+        },
+        {
+            "text": "và trang kinh dựa theo đoạn và trang",
+            "start": 810.639,
+            "duration": 3.76
+        },
+        {
+            "text": "kinh dựa theo câu. Vừa rồi là các kỹ",
+            "start": 812.399,
+            "duration": 4.041
+        },
+        {
+            "text": "thuật trang kinh tương đối cơ bản. Thế",
+            "start": 814.399,
+            "duration": 3.201
+        },
+        {
+            "text": "còn nói về các kỹ thuật trang kinh nâng",
+            "start": 816.44,
+            "duration": 3.24
+        },
+        {
+            "text": "cao thì có rất nhiều kỹ thuật khác nhau",
+            "start": 817.6,
+            "duration": 3.359
+        },
+        {
+            "text": "và một trong số những kỹ thuật phổ biến",
+            "start": 819.68,
+            "duration": 4.0
+        },
+        {
+            "text": "nhất được gọi là semic trang king hay là",
+            "start": 820.959,
+            "duration": 4.801
+        },
+        {
+            "text": "trang king dựa theo ngữ nghĩa. Đối với",
+            "start": 823.68,
+            "duration": 3.68
+        },
+        {
+            "text": "kỹ thuật này thì chúng ta sẽ không trang",
+            "start": 825.76,
+            "duration": 3.68
+        },
+        {
+            "text": "kinh dựa theo độ dài hay là dựa khổ hay",
+            "start": 827.36,
+            "duration": 3.479
+        },
+        {
+            "text": "theo đoạn mà chúng ta sẽ trangng kinh",
+            "start": 829.44,
+            "duration": 3.959
+        },
+        {
+            "text": "dựa theo ý nghĩa. Tức là mỗi một khi nào",
+            "start": 830.839,
+            "duration": 5.0
+        },
+        {
+            "text": "mà chúng ta phát hiện là cái ý nghĩa của",
+            "start": 833.399,
+            "duration": 4.321
+        },
+        {
+            "text": "cái đoạn văn bản nó đổi thì chúng ta sẽ",
+            "start": 835.839,
+            "duration": 3.841
+        },
+        {
+            "text": "sang một cái đoạn trăng mới. Điều này nó",
+            "start": 837.72,
+            "duration": 4.039
+        },
+        {
+            "text": "sẽ đảm bảo cho việc là mỗi một cái trăng",
+            "start": 839.68,
+            "duration": 4.839
+        },
+        {
+            "text": "nó sẽ cover, nó sẽ bao quát một cái nội",
+            "start": 841.759,
+            "duration": 4.841
+        },
+        {
+            "text": "dung cụ thể nào đó. Làm như vậy nó cũng",
+            "start": 844.519,
+            "duration": 3.801
+        },
+        {
+            "text": "tránh cái việc là một cái trang nó đang",
+            "start": 846.6,
+            "duration": 3.08
+        },
+        {
+            "text": "có một cái nội dung liền mạch thì chúng",
+            "start": 848.32,
+            "duration": 2.639
+        },
+        {
+            "text": "ta lại bị ngắt để chúng ta sang một cái",
+            "start": 849.68,
+            "duration": 3.32
+        },
+        {
+            "text": "trang mới. Còn có rất nhiều các kỹ thuật",
+            "start": 850.959,
+            "duration": 3.761
+        },
+        {
+            "text": "trong kênh khác thú vị nữa. Thế nhưng mà",
+            "start": 853.0,
+            "duration": 3.279
+        },
+        {
+            "text": "nếu mà mình đề cập hết trong video này",
+            "start": 854.72,
+            "duration": 3.559
+        },
+        {
+            "text": "nó sẽ khiến cho video rất là dài. Do đó",
+            "start": 856.279,
+            "duration": 3.641
+        },
+        {
+            "text": "thì khi nào mình có thời gian mình sẽ",
+            "start": 858.279,
+            "duration": 3.281
+        },
+        {
+            "text": "làm riêng một cái video để có thể giới",
+            "start": 859.92,
+            "duration": 3.039
+        },
+        {
+            "text": "thiệu với các bạn về các kỹ thuật trong",
+            "start": 861.56,
+            "duration": 3.399
+        },
+        {
+            "text": "king phổ biến nhất hiện nay. Sau khi",
+            "start": 862.959,
+            "duration": 4.041
+        },
+        {
+            "text": "chúng ta đã thực hiện trunking để chia",
+            "start": 864.959,
+            "duration": 3.841
+        },
+        {
+            "text": "nhỏ các cái tài liệu ban đầu thành các",
+            "start": 867.0,
+            "duration": 4.48
+        },
+        {
+            "text": "cái truns có độ dài nhỏ hơn dựa theo một",
+            "start": 868.8,
+            "duration": 4.64
+        },
+        {
+            "text": "cái tiêu chuẩn nào đấy. Ví dụ dựa theo",
+            "start": 871.48,
+            "duration": 4.4
+        },
+        {
+            "text": "độ dài của token là dựa theo ngữ nghĩa.",
+            "start": 873.44,
+            "duration": 4.04
+        },
+        {
+            "text": "Thì việc tiếp theo mà chúng ta cần làm",
+            "start": 875.88,
+            "duration": 3.6
+        },
+        {
+            "text": "là chúng ta sẽ cần phải mã hóa các cái",
+            "start": 877.48,
+            "duration": 5.08
+        },
+        {
+            "text": "trăng này thành các cái vecơ số. Vì sao",
+            "start": 879.48,
+            "duration": 4.84
+        },
+        {
+            "text": "chúng ta lại phải làm như vậy? Lý do",
+            "start": 882.56,
+            "duration": 3.68
+        },
+        {
+            "text": "cũng rất là đơn giản thôi. Các cái trang",
+            "start": 884.32,
+            "duration": 4.24
+        },
+        {
+            "text": "của chúng ta bất kể nó là các cái trang",
+            "start": 886.24,
+            "duration": 4.399
+        },
+        {
+            "text": "được tạo ra từ các văn bản hay là các",
+            "start": 888.56,
+            "duration": 4.8
+        },
+        {
+            "text": "cái trang được tạo ra từ ảnh hoặc là",
+            "start": 890.639,
+            "duration": 5.12
+        },
+        {
+            "text": "audio về mặt bản chất chúng đều là những",
+            "start": 893.36,
+            "duration": 4.039
+        },
+        {
+            "text": "cái loại dữ liệu mà các mô hình có ngữ",
+            "start": 895.759,
+            "duration": 3.921
+        },
+        {
+            "text": "lớn chưa thể trực tiếp hiểu và sử dụng",
+            "start": 897.399,
+            "duration": 4.481
+        },
+        {
+            "text": "ngay. Các mô hình nói riêng hay là máy",
+            "start": 899.68,
+            "duration": 3.839
+        },
+        {
+            "text": "móc nói chung khác với con người chúng",
+            "start": 901.88,
+            "duration": 4.399
+        },
+        {
+            "text": "ta. Chúng ta có thể hiểu dữ liệu dưới",
+            "start": 903.519,
+            "duration": 4.601
+        },
+        {
+            "text": "nhiều dạng khác nhau. Chúng ta có thể",
+            "start": 906.279,
+            "duration": 4.641
+        },
+        {
+            "text": "hiểu văn bản, hình ảnh, video hay là âm",
+            "start": 908.12,
+            "duration": 4.719
+        },
+        {
+            "text": "thanh. Thế nhưng mà mô hình hay là máy",
+            "start": 910.92,
+            "duration": 3.88
+        },
+        {
+            "text": "móc về mặt bản chất chúng chỉ có thể",
+            "start": 912.839,
+            "duration": 4.841
+        },
+        {
+            "text": "hiểu được hai mã nhị phân là 0 và 1 mà",
+            "start": 914.8,
+            "duration": 5.56
+        },
+        {
+            "text": "thôi. Tất nhiên khi chúng ta sử dụng các",
+            "start": 917.68,
+            "duration": 4.44
+        },
+        {
+            "text": "cái ngũ lập trình bậc cao ví dụ như là",
+            "start": 920.36,
+            "duration": 3.56
+        },
+        {
+            "text": "Python chẳng hạn thì chúng ta cũng không",
+            "start": 922.12,
+            "duration": 4.24
+        },
+        {
+            "text": "đến mức là chúng ta phải số hóa các cái",
+            "start": 923.92,
+            "duration": 4.399
+        },
+        {
+            "text": "dữ liệu chúng ta về dạng cái bit nhị",
+            "start": 926.36,
+            "duration": 3.959
+        },
+        {
+            "text": "phân 01. Thế nhưng mà ít nhất chúng ta",
+            "start": 928.319,
+            "duration": 3.921
+        },
+        {
+            "text": "cũng cần phải số hóa nó về các cái vecơ",
+            "start": 930.319,
+            "duration": 3.841
+        },
+        {
+            "text": "dạng số để sau đó thì các mô hình chúng",
+            "start": 932.24,
+            "duration": 3.959
+        },
+        {
+            "text": "ta nó sẽ hiểu và nó sử dụng các cái vecơ",
+            "start": 934.16,
+            "duration": 4.52
+        },
+        {
+            "text": "này. Để thực hiện được việc số hóa này,",
+            "start": 936.199,
+            "duration": 5.241
+        },
+        {
+            "text": "chúng ta sẽ cần sử dụng các eding model.",
+            "start": 938.68,
+            "duration": 5.2
+        },
+        {
+            "text": "Về mặt bản chất thì các em order sẽ nhận",
+            "start": 941.44,
+            "duration": 5.56
+        },
+        {
+            "text": "đầu vào là một trang và đầu ra là vecơ",
+            "start": 943.88,
+            "duration": 5.519
+        },
+        {
+            "text": "tương ứng với cái trang đó. Có rất nhiều",
+            "start": 947.0,
+            "duration": 5.16
+        },
+        {
+            "text": "loại model khác nhau. Có những loại em",
+            "start": 949.399,
+            "duration": 5.041
+        },
+        {
+            "text": "model nó chỉ nhận đầu vào là dữ liệu",
+            "start": 952.16,
+            "duration": 5.159
+        },
+        {
+            "text": "dạng text. Có những model nó sẽ nhận đồ",
+            "start": 954.44,
+            "duration": 5.319
+        },
+        {
+            "text": "vào là dữ liệu dạng hình ảnh và có cả",
+            "start": 957.319,
+            "duration": 4.721
+        },
+        {
+            "text": "những ing model nó sẽ nhận đồ vào là cả",
+            "start": 959.759,
+            "duration": 4.161
+        },
+        {
+            "text": "dữ liệu dạng tex hay là dữ liệu hình ảnh",
+            "start": 962.04,
+            "duration": 3.0
+        },
+        {
+            "text": "cũng như là những cái loại dữ liệu khác",
+            "start": 963.92,
+            "duration": 3.44
+        },
+        {
+            "text": "nữa ví dụ như là audio thì những loại",
+            "start": 965.04,
+            "duration": 4.44
+        },
+        {
+            "text": "ing model này người ta gọi với người tên",
+            "start": 967.36,
+            "duration": 4.76
+        },
+        {
+            "text": "gọi là multi modeling model tức là những",
+            "start": 969.48,
+            "duration": 4.88
+        },
+        {
+            "text": "cáiing model đa phương tiện nó có thể",
+            "start": 972.12,
+            "duration": 3.56
+        },
+        {
+            "text": "làm việc với nhiều kiểu dữ liệu khác",
+            "start": 974.36,
+            "duration": 3.8
+        },
+        {
+            "text": "nhau. Các em order không phải tự dưng",
+            "start": 975.68,
+            "duration": 4.04
+        },
+        {
+            "text": "trên trờ dây xuống mà chúng cần phải",
+            "start": 978.16,
+            "duration": 3.52
+        },
+        {
+            "text": "được xây dựng và huấn luyện với rất",
+            "start": 979.72,
+            "duration": 4.32
+        },
+        {
+            "text": "nhiều dữ liệu. Do đó thì thường chỉ có",
+            "start": 981.68,
+            "duration": 5.399
+        },
+        {
+            "text": "những ông lớn ví dụ như là Open AI, Meta",
+            "start": 984.04,
+            "duration": 5.08
+        },
+        {
+            "text": "hay là Google mới có khả năng để có thể",
+            "start": 987.079,
+            "duration": 4.361
+        },
+        {
+            "text": "huấn luyện được các model này. Người ta",
+            "start": 989.12,
+            "duration": 4.92
+        },
+        {
+            "text": "thường phân chia các model ra làm hai",
+            "start": 991.44,
+            "duration": 5.12
+        },
+        {
+            "text": "nhóm chính. Nhóm đầu tiên là nhóm bao",
+            "start": 994.04,
+            "duration": 4.64
+        },
+        {
+            "text": "gồm các model mà chúng ta chỉ có thể sử",
+            "start": 996.56,
+            "duration": 4.68
+        },
+        {
+            "text": "dụng thông qua việc gọi API. Và nhóm thứ",
+            "start": 998.68,
+            "duration": 4.92
+        },
+        {
+            "text": "hai là nhóm các model mà chúng ta có thể",
+            "start": 1001.24,
+            "duration": 4.519
+        },
+        {
+            "text": "tự host trên máy hoặc là trên server của",
+            "start": 1003.6,
+            "duration": 4.64
+        },
+        {
+            "text": "chúng ta. Các em order thuộc nhóm thứ",
+            "start": 1005.759,
+            "duration": 3.961
+        },
+        {
+            "text": "nhất, nhóm mà chúng ta phải sử dụng",
+            "start": 1008.24,
+            "duration": 4.039
+        },
+        {
+            "text": "thông qua API. Nó có cái ưu điểm đó là",
+            "start": 1009.72,
+            "duration": 4.52
+        },
+        {
+            "text": "chúng ta sử dụng rất là đơn giản, chúng",
+            "start": 1012.279,
+            "duration": 3.36
+        },
+        {
+            "text": "ta không cần phải lo lắng về cơ sở hạ",
+            "start": 1014.24,
+            "duration": 3.2
+        },
+        {
+            "text": "tầng và thường thì chất lượng của các em",
+            "start": 1015.639,
+            "duration": 4.68
+        },
+        {
+            "text": "model này rất là cao. Tuy nhiên sử dụng",
+            "start": 1017.44,
+            "duration": 4.399
+        },
+        {
+            "text": "các model theo hướng này nó cũng có một",
+            "start": 1020.319,
+            "duration": 3.52
+        },
+        {
+            "text": "vài những cái nhược điểm. Nhược điểm đầu",
+            "start": 1021.839,
+            "duration": 3.72
+        },
+        {
+            "text": "tiên là các bạn sẽ bắt buộc phải gửi dữ",
+            "start": 1023.839,
+            "duration": 4.48
+        },
+        {
+            "text": "liệu của mình sang một bên thứ ba. Ví dụ",
+            "start": 1025.559,
+            "duration": 4.841
+        },
+        {
+            "text": "các bạn đang dùng các cái model của Open",
+            "start": 1028.319,
+            "duration": 3.64
+        },
+        {
+            "text": "AI thì các bạn sẽ bắt buộc phải gửi dữ",
+            "start": 1030.4,
+            "duration": 3.439
+        },
+        {
+            "text": "liệu động của mình cho họ. Như điểm thứ",
+            "start": 1031.959,
+            "duration": 3.401
+        },
+        {
+            "text": "hai đó là các bạn sẽ không thể nào các",
+            "start": 1033.839,
+            "duration": 3.041
+        },
+        {
+            "text": "bạn có thể file tool trực tiếp được các",
+            "start": 1035.36,
+            "duration": 3.4
+        },
+        {
+            "text": "cái mô hình này. Một vài các mô hình",
+            "start": 1036.88,
+            "duration": 3.36
+        },
+        {
+            "text": "tiêu hiểu trong nhóm này chúng ta có thể",
+            "start": 1038.76,
+            "duration": 5.199
+        },
+        {
+            "text": "kể đến ví dụ như là text em small và",
+            "start": 1040.24,
+            "duration": 6.959
+        },
+        {
+            "text": "text em slash của Open AI hay là cái",
+            "start": 1043.959,
+            "duration": 5.801
+        },
+        {
+            "text": "mining của Google. Thế còn đối với các",
+            "start": 1047.199,
+            "duration": 4.561
+        },
+        {
+            "text": "cái order mà người dụng chúng ta có thể",
+            "start": 1049.76,
+            "duration": 3.56
+        },
+        {
+            "text": "tự host thì nó có một vài những cái ưu",
+            "start": 1051.76,
+            "duration": 3.44
+        },
+        {
+            "text": "điểm. Ưu điểm đầu tiên là các bạn có thể",
+            "start": 1053.32,
+            "duration": 3.44
+        },
+        {
+            "text": "hoàn là sử dụng chúng mà không cần phải",
+            "start": 1055.2,
+            "duration": 4.08
+        },
+        {
+            "text": "có internet. Ưu điểm thứ hai là các bạn",
+            "start": 1056.76,
+            "duration": 4.48
+        },
+        {
+            "text": "sẽ hoàn toàn kiểm soát luồn dữ liệu. Tức",
+            "start": 1059.28,
+            "duration": 3.519
+        },
+        {
+            "text": "là các bạn sẽ không phải lo cái dữ liệu",
+            "start": 1061.24,
+            "duration": 3.2
+        },
+        {
+            "text": "nó sẽ bị tuồn ra ngoài. Đây là một yếu",
+            "start": 1062.799,
+            "duration": 3.0
+        },
+        {
+            "text": "tố rất là quan trọng với những cái ứng",
+            "start": 1064.44,
+            "duration": 3.4
+        },
+        {
+            "text": "dụng mà chúng ta quan tâm đến data",
+            "start": 1065.799,
+            "duration": 4.601
+        },
+        {
+            "text": "privacy. Tuy nhiên như điểm của nhóm này",
+            "start": 1067.84,
+            "duration": 4.52
+        },
+        {
+            "text": "đó là chúng ta sẽ cần phải tự setup, tự",
+            "start": 1070.4,
+            "duration": 3.88
+        },
+        {
+            "text": "lo cấu hình cơ sở hạ tầng. Chúng ta sẽ",
+            "start": 1072.36,
+            "duration": 3.679
+        },
+        {
+            "text": "cần phải có GPU đủ mạnh để có thể chạy",
+            "start": 1074.28,
+            "duration": 4.48
+        },
+        {
+            "text": "cái mô hình này. Ngoài ra nhìn chung thì",
+            "start": 1076.039,
+            "duration": 5.281
+        },
+        {
+            "text": "chất lượng của các em vector được tạo ra",
+            "start": 1078.76,
+            "duration": 4.919
+        },
+        {
+            "text": "từ các em model mà chúng ta tự host nó",
+            "start": 1081.32,
+            "duration": 4.28
+        },
+        {
+            "text": "sẽ không tốt bằng so với các em order",
+            "start": 1083.679,
+            "duration": 4.401
+        },
+        {
+            "text": "model mà chúng ta sử dụng thông qua API.",
+            "start": 1085.6,
+            "duration": 3.959
+        },
+        {
+            "text": "Sau khi chúng ta đã tạo ra được rất",
+            "start": 1088.08,
+            "duration": 3.32
+        },
+        {
+            "text": "nhiều các embeding vector, mỗi một",
+            "start": 1089.559,
+            "duration": 3.881
+        },
+        {
+            "text": "embeding vector tương ứng với một trang",
+            "start": 1091.4,
+            "duration": 3.24
+        },
+        {
+            "text": "thì bây gi chúng ta sẽ cần phải có một",
+            "start": 1093.44,
+            "duration": 4.08
+        },
+        {
+            "text": "nơi để chúng ta có thể lưu trữ, quản lý",
+            "start": 1094.64,
+            "duration": 4.48
+        },
+        {
+            "text": "cũng như là sử dụng các cái eding vector",
+            "start": 1097.52,
+            "duration": 4.279
+        },
+        {
+            "text": "này. Và nơi như vậy trong grap người ta",
+            "start": 1099.12,
+            "duration": 5.16
+        },
+        {
+            "text": "gọi đó là vector database. Như trong",
+            "start": 1101.799,
+            "duration": 4.401
+        },
+        {
+            "text": "hình mà các bạn đang thấy, mỗi một chấm",
+            "start": 1104.28,
+            "duration": 4.519
+        },
+        {
+            "text": "tròn tương ứng với một vector. Một",
+            "start": 1106.2,
+            "duration": 4.4
+        },
+        {
+            "text": "vector database toost là một vector",
+            "start": 1108.799,
+            "duration": 4.24
+        },
+        {
+            "text": "database giúp chúng ta có thể lưu trữ,",
+            "start": 1110.6,
+            "duration": 4.92
+        },
+        {
+            "text": "quản lý cũng như là truy xuất các ingor",
+            "start": 1113.039,
+            "duration": 4.721
+        },
+        {
+            "text": "một cách hiệu quả và nhanh chóng. Có rất",
+            "start": 1115.52,
+            "duration": 4.24
+        },
+        {
+            "text": "nhiều bên cung cấp các vector database",
+            "start": 1117.76,
+            "duration": 4.24
+        },
+        {
+            "text": "khác nhau. Có những loại miễn phí và có",
+            "start": 1119.76,
+            "duration": 4.279
+        },
+        {
+            "text": "những loại trả phí. Nhưng cái loại miễn",
+            "start": 1122.0,
+            "duration": 3.48
+        },
+        {
+            "text": "phí thì thường nó sẽ đơn giản và nó sẽ",
+            "start": 1124.039,
+            "duration": 2.721
+        },
+        {
+            "text": "phù hợp với những người mới bắt đầu,",
+            "start": 1125.48,
+            "duration": 2.36
+        },
+        {
+            "text": "những người muốn xây dựng những cái",
+            "start": 1126.76,
+            "duration": 3.2
+        },
+        {
+            "text": "project nhỏ. Thế còn những cái vector",
+            "start": 1127.84,
+            "duration": 3.8
+        },
+        {
+            "text": "base trả phí thì thường nó sẽ phù hợp",
+            "start": 1129.96,
+            "duration": 3.44
+        },
+        {
+            "text": "cho môi trường production khi chúng ta",
+            "start": 1131.64,
+            "duration": 3.919
+        },
+        {
+            "text": "có cái lược rượu rất là lớn và chúng ta",
+            "start": 1133.4,
+            "duration": 4.12
+        },
+        {
+            "text": "muốn đảm bảo là cái thời gian xử lý nó",
+            "start": 1135.559,
+            "duration": 4.441
+        },
+        {
+            "text": "sẽ nhanh. Vector database là một thành",
+            "start": 1137.52,
+            "duration": 4.039
+        },
+        {
+            "text": "phần vô cùng quan trọng và cũng rất là",
+            "start": 1140.0,
+            "duration": 4.2
+        },
+        {
+            "text": "thú vị trong grap. Nếu có thời gian mình",
+            "start": 1141.559,
+            "duration": 4.641
+        },
+        {
+            "text": "sẽ làm riêng một video để có thể nói kỹ",
+            "start": 1144.2,
+            "duration": 5.04
+        },
+        {
+            "text": "hơn về chủ đề này. Ok, đến đây là chúng",
+            "start": 1146.2,
+            "duration": 4.8
+        },
+        {
+            "text": "ta đã xong giai đoạn tiền xử lý và giai",
+            "start": 1149.24,
+            "duration": 3.08
+        },
+        {
+            "text": "đoạn của chúng ta sẽ phải thực hiện",
+            "start": 1151.0,
+            "duration": 3.159
+        },
+        {
+            "text": "trước khi người dùng họ bắt đầu sử dụng",
+            "start": 1152.32,
+            "duration": 4.28
+        },
+        {
+            "text": "chatbot của chúng ta. Thì bây giờ khi mà",
+            "start": 1154.159,
+            "duration": 4.4
+        },
+        {
+            "text": "người dùng họ có một câu hỏi nào đấy, ví",
+            "start": 1156.6,
+            "duration": 4.88
+        },
+        {
+            "text": "dụ họ có câu hỏi là trong năm vừa qua ở",
+            "start": 1158.559,
+            "duration": 4.48
+        },
+        {
+            "text": "trường đại học X thì có những cái bài",
+            "start": 1161.48,
+            "duration": 3.24
+        },
+        {
+            "text": "bán nghiên cứu nào về chủ đề chuyển đổi",
+            "start": 1163.039,
+            "duration": 3.601
+        },
+        {
+            "text": "số chẳng hạn? Cái câu hỏi này của người",
+            "start": 1164.72,
+            "duration": 4.4
+        },
+        {
+            "text": "dùng cũng sẽ được cho qua cái eding",
+            "start": 1166.64,
+            "duration": 4.399
+        },
+        {
+            "text": "model để chúng ta có thể tạo ra được một",
+            "start": 1169.12,
+            "duration": 4.96
+        },
+        {
+            "text": "cái vecơ có cùng số chiều với các cáiing",
+            "start": 1171.039,
+            "duration": 5.481
+        },
+        {
+            "text": "vector mà chúng ta đã làm ở bước trước.",
+            "start": 1174.08,
+            "duration": 3.64
+        },
+        {
+            "text": "Ở đây có một điểm mà chúng ta cần phải",
+            "start": 1176.52,
+            "duration": 3.48
+        },
+        {
+            "text": "chú ý đó là ở cái bước trước cái bước",
+            "start": 1177.72,
+            "duration": 4.4
+        },
+        {
+            "text": "tiền xử lý chúng ta đã sử dụng cáiing",
+            "start": 1180.0,
+            "duration": 4.44
+        },
+        {
+            "text": "model nào để có thể vectơ hóa các cái",
+            "start": 1182.12,
+            "duration": 4.36
+        },
+        {
+            "text": "trang dữ liệu thì ở bước này chúng ta",
+            "start": 1184.44,
+            "duration": 4.44
+        },
+        {
+            "text": "cũng sẽ phải dùng đúng cái ing model đó",
+            "start": 1186.48,
+            "duration": 4.8
+        },
+        {
+            "text": "để có thể vector hóa cái câu hỏi của",
+            "start": 1188.88,
+            "duration": 5.12
+        },
+        {
+            "text": "người dùng. Điều này nhằm đảm bảo các em",
+            "start": 1191.28,
+            "duration": 5.32
+        },
+        {
+            "text": "vecor được tạo ra từ các trang cũng như",
+            "start": 1194.0,
+            "duration": 4.84
+        },
+        {
+            "text": "là các em vector được tạo ra từ câu hỏi",
+            "start": 1196.6,
+            "duration": 3.84
+        },
+        {
+            "text": "của người dùng sẽ nằm trong cùng một",
+            "start": 1198.84,
+            "duration": 3.16
+        },
+        {
+            "text": "chiều không gian và từ đó thì chúng ta",
+            "start": 1200.44,
+            "duration": 3.4
+        },
+        {
+            "text": "có thể so sánh chúng ta tính toán khoảng",
+            "start": 1202.0,
+            "duration": 3.559
+        },
+        {
+            "text": "cách giữa chúng.",
+            "start": 1203.84,
+            "duration": 3.839
+        },
+        {
+            "text": "ing vector của cơ hỏi của người dùng về",
+            "start": 1205.559,
+            "duration": 4.721
+        },
+        {
+            "text": "mặt bản chất nó cũng là một cái vecơ và",
+            "start": 1207.679,
+            "duration": 4.041
+        },
+        {
+            "text": "bây giờ chúng ta sẽ làm một cái việc là",
+            "start": 1210.28,
+            "duration": 3.6
+        },
+        {
+            "text": "chúng ta sẽ tìm xem trong cái vector",
+            "start": 1211.72,
+            "duration": 4.52
+        },
+        {
+            "text": "database nơi mà chúng ta đã lưu trữ các",
+            "start": 1213.88,
+            "duration": 4.36
+        },
+        {
+            "text": "bing vector của các trunks từ bước trước",
+            "start": 1216.24,
+            "duration": 4.439
+        },
+        {
+            "text": "rồi chúng ta sẽ tìm xem là đâu là những",
+            "start": 1218.24,
+            "duration": 5.319
+        },
+        {
+            "text": "cái vector mà nó tương đồng nhất nó gần",
+            "start": 1220.679,
+            "duration": 5.12
+        },
+        {
+            "text": "gũi nhất với cái eding vector của câu",
+            "start": 1223.559,
+            "duration": 4.041
+        },
+        {
+            "text": "hỏi của người dùng có rất nhiều cách",
+            "start": 1225.799,
+            "duration": 3.481
+        },
+        {
+            "text": "khác nhau để có thể đánh giá được sự",
+            "start": 1227.6,
+            "duration": 4.28
+        },
+        {
+            "text": "tương đồng giữa em vector của câu hỏi và",
+            "start": 1229.28,
+            "duration": 4.759
+        },
+        {
+            "text": "em vector của trun nhưng mà cách phổ",
+            "start": 1231.88,
+            "duration": 3.52
+        },
+        {
+            "text": "biến nhất cách được sử dụng rộng rãnh",
+            "start": 1234.039,
+            "duration": 4.201
+        },
+        {
+            "text": "nhất đó là dựa trên cos similarity. Với",
+            "start": 1235.4,
+            "duration": 5.08
+        },
+        {
+            "text": "cách này, về mặt bản chất chúng ta sẽ đo",
+            "start": 1238.24,
+            "duration": 4.679
+        },
+        {
+            "text": "góc được tạo ra bởi hai vecơ và nếu góc",
+            "start": 1240.48,
+            "duration": 4.28
+        },
+        {
+            "text": "này nó càng bé thì hai vecơ càng tương",
+            "start": 1242.919,
+            "duration": 3.921
+        },
+        {
+            "text": "đồng với nhau. Sau khi chúng ta đã tìm",
+            "start": 1244.76,
+            "duration": 4.72
+        },
+        {
+            "text": "ra được các em vecor của các cái chance",
+            "start": 1246.84,
+            "duration": 4.76
+        },
+        {
+            "text": "nó tương đồng nhất với em vectơ của câu",
+            "start": 1249.48,
+            "duration": 4.439
+        },
+        {
+            "text": "hỏi của người dùng thì các cái vecor này",
+            "start": 1251.6,
+            "duration": 4.52
+        },
+        {
+            "text": "sẽ được sử dụng như là context, như là",
+            "start": 1253.919,
+            "duration": 3.841
+        },
+        {
+            "text": "ngữ cảnh để giúp cho chatbot của chúng",
+            "start": 1256.12,
+            "duration": 4.039
+        },
+        {
+            "text": "ta nó có thể trả lời được câu hỏi. Như",
+            "start": 1257.76,
+            "duration": 4.159
+        },
+        {
+            "text": "các bạn có thể nhìn trên hình, chấm tròn",
+            "start": 1260.159,
+            "duration": 4.801
+        },
+        {
+            "text": "màu xanh lá cây đại diện cho vecor của",
+            "start": 1261.919,
+            "duration": 5.161
+        },
+        {
+            "text": "câu hỏi của người dùng. Trong khi bốn",
+            "start": 1264.96,
+            "duration": 4.16
+        },
+        {
+            "text": "cái chấm tròn màu ghi nó đại diện cho",
+            "start": 1267.08,
+            "duration": 4.839
+        },
+        {
+            "text": "các cái vecor của bốn cái trang mà nó",
+            "start": 1269.12,
+            "duration": 4.64
+        },
+        {
+            "text": "gần gũi, nó tương đồng nhất với câu hỏi",
+            "start": 1271.919,
+            "duration": 4.681
+        },
+        {
+            "text": "này. Bây giờ ở bước cuối cùng chúng ta",
+            "start": 1273.76,
+            "duration": 5.48
+        },
+        {
+            "text": "sẽ viết lại một cái prom được xây dựng",
+            "start": 1276.6,
+            "duration": 5.12
+        },
+        {
+            "text": "dựa trên câu hỏi của người dùng cũng như",
+            "start": 1279.24,
+            "duration": 4.88
+        },
+        {
+            "text": "là cái context, cái ngữ cảnh được tạo ra",
+            "start": 1281.72,
+            "duration": 4.48
+        },
+        {
+            "text": "từ những cái trang có liên quan nhất. Và",
+            "start": 1284.12,
+            "duration": 3.28
+        },
+        {
+            "text": "sau đó chúng ta sẽ dùng cái prom này",
+            "start": 1286.2,
+            "duration": 3.359
+        },
+        {
+            "text": "chúng ta hỏi cái mô hình ngôn ngữ lớn và",
+            "start": 1287.4,
+            "duration": 3.879
+        },
+        {
+            "text": "mô hình ngôn ngữ lớn nó sẽ đưa ra câu",
+            "start": 1289.559,
+            "duration": 4.041
+        },
+        {
+            "text": "trả lời và câu trả lời này sẽ được trả",
+            "start": 1291.279,
+            "duration": 4.121
+        },
+        {
+            "text": "về cho người dùng. Vậy là chúng ta đã",
+            "start": 1293.6,
+            "duration": 3.48
+        },
+        {
+            "text": "cùng nhau tìm hiểu về một luồng hoạt",
+            "start": 1295.4,
+            "duration": 4.72
+        },
+        {
+            "text": "động điển hình của một ro chatbot. Tất",
+            "start": 1297.08,
+            "duration": 4.32
+        },
+        {
+            "text": "nhiên tất cả những gì mà chúng ta nói",
+            "start": 1300.12,
+            "duration": 2.64
+        },
+        {
+            "text": "trong video này nó chỉ là những ý thức",
+            "start": 1301.4,
+            "duration": 3.36
+        },
+        {
+            "text": "tổng quát nhất. Khi mà các bạn thực sự",
+            "start": 1302.76,
+            "duration": 3.76
+        },
+        {
+            "text": "các bạn bắt tay vào xây dựng một cái R",
+            "start": 1304.76,
+            "duration": 3.12
+        },
+        {
+            "text": "chatbot để có thể triển khai trong thực",
+            "start": 1306.52,
+            "duration": 2.96
+        },
+        {
+            "text": "tế thì sẽ còn rất nhiều điều mà các bạn",
+            "start": 1307.88,
+            "duration": 3.64
+        },
+        {
+            "text": "sẽ cần phải tìm hiểu. Trong một vài tuần",
+            "start": 1309.48,
+            "duration": 4.24
+        },
+        {
+            "text": "tới mình sẽ làm một video để có thể",
+            "start": 1311.52,
+            "duration": 4.68
+        },
+        {
+            "text": "hướng dẫn các bạn cách tự code, tự xây",
+            "start": 1313.72,
+            "duration": 4.8
+        },
+        {
+            "text": "dựng một ro chatpot, sử dụng framework",
+            "start": 1316.2,
+            "duration": 4.04
+        },
+        {
+            "text": "lanchange, một framework vô cùng phổ",
+            "start": 1318.52,
+            "duration": 4.08
+        },
+        {
+            "text": "biến trong việc xây dựng các AI agent.",
+            "start": 1320.24,
+            "duration": 3.48
+        },
+        {
+            "text": "Mình hy vọng là những chia sẻ trong",
+            "start": 1322.6,
+            "duration": 3.439
+        },
+        {
+            "text": "video này hữu ích với các bạn. Mình rất",
+            "start": 1323.72,
+            "duration": 4.04
+        },
+        {
+            "text": "cảm ơn các bạn đã dành thời gian đ của",
+            "start": 1326.039,
+            "duration": 3.561
+        },
+        {
+            "text": "mình. Mình sẽ hẹ các bạn ở những video",
+            "start": 1327.76,
+            "duration": 4.32
+        },
+        {
+            "text": "sau. Nếu các bạn đang quan tâm, đang tìm",
+            "start": 1329.6,
+            "duration": 5.28
+        },
+        {
+            "text": "hiểu về các cái khoa học online về AI,",
+            "start": 1332.08,
+            "duration": 4.88
+        },
+        {
+            "text": "data science, machine learning thì các",
+            "start": 1334.88,
+            "duration": 4.2
+        },
+        {
+            "text": "bạn có thể ở lại để nghe tiếp phần này.",
+            "start": 1336.96,
+            "duration": 4.64
+        },
+        {
+            "text": "Đầu tiên là khóa Python và AI cơ bản",
+            "start": 1339.08,
+            "duration": 3.92
+        },
+        {
+            "text": "được thiết kế để hướng đến những bạn",
+            "start": 1341.6,
+            "duration": 3.12
+        },
+        {
+            "text": "trái ngành, những bạn chưa từng tiếp xúc",
+            "start": 1343.0,
+            "duration": 3.799
+        },
+        {
+            "text": "với lập trình hay là IT bao giờ. Trong",
+            "start": 1344.72,
+            "duration": 3.6
+        },
+        {
+            "text": "khoa học này, các bạn sẽ được dạy những",
+            "start": 1346.799,
+            "duration": 2.76
+        },
+        {
+            "text": "cái kiến thức cơ bản về lập trình",
+            "start": 1348.32,
+            "duration": 3.2
+        },
+        {
+            "text": "Python. Các bạn cũng sẽ được làm quen",
+            "start": 1349.559,
+            "duration": 3.36
+        },
+        {
+            "text": "với những cái thư viện Python hay được",
+            "start": 1351.52,
+            "duration": 4.72
+        },
+        {
+            "text": "sử dụng trong lĩnh vực dat machining.",
+            "start": 1352.919,
+            "duration": 5.481
+        },
+        {
+            "text": "Đồng thời các bạn cũng sẽ được chia sẻ",
+            "start": 1356.24,
+            "duration": 4.439
+        },
+        {
+            "text": "về những cái ứng dụng của AI trong những",
+            "start": 1358.4,
+            "duration": 4.2
+        },
+        {
+            "text": "cái lĩnh vực trong cuộc sống thực tế.",
+            "start": 1360.679,
+            "duration": 3.24
+        },
+        {
+            "text": "Khoa học thứ hai mà bọn mình sẽ khai",
+            "start": 1362.6,
+            "duration": 2.959
+        },
+        {
+            "text": "giảng trong thời gian tới là khoa học",
+            "start": 1363.919,
+            "duration": 3.441
+        },
+        {
+            "text": "chủ chốt mà bọn mình mở nhiều lớp nhất",
+            "start": 1365.559,
+            "duration": 4.201
+        },
+        {
+            "text": "từ trước cho đến giờ. Đó là khóa data và",
+            "start": 1367.36,
+            "duration": 4.199
+        },
+        {
+            "text": "machine learning nâng cao. Khóa này",
+            "start": 1369.76,
+            "duration": 3.799
+        },
+        {
+            "text": "hướng đến các bạn đang học hoặc đang làm",
+            "start": 1371.559,
+            "duration": 3.641
+        },
+        {
+            "text": "cho liên công nghệ thông tin hoặc những",
+            "start": 1373.559,
+            "duration": 3.561
+        },
+        {
+            "text": "bạn đã có kinh nghiệm về lập trình rồi.",
+            "start": 1375.2,
+            "duration": 3.599
+        },
+        {
+            "text": "Khóa học này sẽ cung cấp cho các bạn",
+            "start": 1377.12,
+            "duration": 3.28
+        },
+        {
+            "text": "toàn bộ những kiến thức các bạn cần biết",
+            "start": 1378.799,
+            "duration": 3.681
+        },
+        {
+            "text": "về data science và machine learning.",
+            "start": 1380.4,
+            "duration": 3.6
+        },
+        {
+            "text": "Ngoài ra trong khóa học này chúng ta",
+            "start": 1382.48,
+            "duration": 3.16
+        },
+        {
+            "text": "cũng sẽ tìm hiểu về hai cái nhánh ứng",
+            "start": 1384.0,
+            "duration": 3.799
+        },
+        {
+            "text": "dụng chính của AI đó là xử lý ngôn ngữ",
+            "start": 1385.64,
+            "duration": 4.44
+        },
+        {
+            "text": "tự nhiên và thị giáp máy tính. Trong",
+            "start": 1387.799,
+            "duration": 4.041
+        },
+        {
+            "text": "khóa học này các bạn sẽ được làm việc",
+            "start": 1390.08,
+            "duration": 3.8
+        },
+        {
+            "text": "với private dataset mà mình lấy ra từ",
+            "start": 1391.84,
+            "duration": 3.719
+        },
+        {
+            "text": "công ty cũ của mình làm về lĩnh vực",
+            "start": 1393.88,
+            "duration": 3.56
+        },
+        {
+            "text": "tuyển dụng để các bạn có thể thấy được",
+            "start": 1395.559,
+            "duration": 4.161
+        },
+        {
+            "text": "sự khác biệt giữa public dataset mà các",
+            "start": 1397.44,
+            "duration": 3.92
+        },
+        {
+            "text": "bạn có thể dễ dàng download trên mạng",
+            "start": 1399.72,
+            "duration": 3.6
+        },
+        {
+            "text": "với những private dataset mà các bạn sẽ",
+            "start": 1401.36,
+            "duration": 3.72
+        },
+        {
+            "text": "chỉ có thể được tiếp xúc khi các bạn sau",
+            "start": 1403.32,
+            "duration": 3.8
+        },
+        {
+            "text": "này các bạn đi làm ở các công ty. Khoa",
+            "start": 1405.08,
+            "duration": 3.76
+        },
+        {
+            "text": "học tiếp theo là khóa deep learning",
+            "start": 1407.12,
+            "duration": 4.2
+        },
+        {
+            "text": "foram vision cơ bản. Khóa học này hướng",
+            "start": 1408.84,
+            "duration": 4.76
+        },
+        {
+            "text": "đến những bạn đã có kiến thức cơ bản về",
+            "start": 1411.32,
+            "duration": 4.359
+        },
+        {
+            "text": "machining và các bạn muốn tiếp tục tìm",
+            "start": 1413.6,
+            "duration": 4.6
+        },
+        {
+            "text": "hiểu lên về deep learning. Deep learning",
+            "start": 1415.679,
+            "duration": 4.401
+        },
+        {
+            "text": "for computer vision cũng là cái hướng đi",
+            "start": 1418.2,
+            "duration": 3.76
+        },
+        {
+            "text": "mà mình chọn trong quá trình học thạc sĩ",
+            "start": 1420.08,
+            "duration": 3.92
+        },
+        {
+            "text": "tại đạp học kriptomonic. Và đây cũng là",
+            "start": 1421.96,
+            "duration": 3.88
+        },
+        {
+            "text": "cái nhánh mà mình làm việc trong suốt",
+            "start": 1424.0,
+            "duration": 4.32
+        },
+        {
+            "text": "hơn 4 năm qua. Trong form này chúng ta",
+            "start": 1425.84,
+            "duration": 3.92
+        },
+        {
+            "text": "sẽ cùng nhau tìm hiểu về những cái kiến",
+            "start": 1428.32,
+            "duration": 3.52
+        },
+        {
+            "text": "thức cơ bản nhất mà các bạn cần biết về",
+            "start": 1429.76,
+            "duration": 4.72
+        },
+        {
+            "text": "deep learning bao gồm là new network,",
+            "start": 1431.84,
+            "duration": 4.4
+        },
+        {
+            "text": "convolution of new network và những cái",
+            "start": 1434.48,
+            "duration": 3.92
+        },
+        {
+            "text": "layer đứng sau những cái kiến trúc này.",
+            "start": 1436.24,
+            "duration": 3.72
+        },
+        {
+            "text": "Chúng ta cũng sẽ cùng nhau tìm hiểu về",
+            "start": 1438.4,
+            "duration": 3.6
+        },
+        {
+            "text": "những cái mô hình CNN phổ biến nhất từ",
+            "start": 1439.96,
+            "duration": 3.959
+        },
+        {
+            "text": "trước cho đến nay cũng như là bài toán",
+            "start": 1442.0,
+            "duration": 4.0
+        },
+        {
+            "text": "image classification. Bài toán có thể",
+            "start": 1443.919,
+            "duration": 3.76
+        },
+        {
+            "text": "nói là cơ bản nhất trong mảng thị giáp",
+            "start": 1446.0,
+            "duration": 3.76
+        },
+        {
+            "text": "máy tính. Khoa học tiếp theo là khóa",
+            "start": 1447.679,
+            "duration": 3.561
+        },
+        {
+            "text": "deep learning for computer vision nâng",
+            "start": 1449.76,
+            "duration": 3.56
+        },
+        {
+            "text": "cao. Khoa học này hướng đến những bạn đã",
+            "start": 1451.24,
+            "duration": 3.84
+        },
+        {
+            "text": "hoàn thành khóa cơ bản và các bạn muốn",
+            "start": 1453.32,
+            "duration": 3.92
+        },
+        {
+            "text": "tiếp tục tìm hiểu về cái topic nâng cao",
+            "start": 1455.08,
+            "duration": 4.64
+        },
+        {
+            "text": "như là object detection, image",
+            "start": 1457.24,
+            "duration": 6.679
+        },
+        {
+            "text": "segmentation, gans hay là OC. Ngoài ra",
+            "start": 1459.72,
+            "duration": 5.8
+        },
+        {
+            "text": "trong khóa học này chúng ta cũng sẽ cùng",
+            "start": 1463.919,
+            "duration": 3.401
+        },
+        {
+            "text": "nhau tìm hiểu và học cách sử dụng",
+            "start": 1465.52,
+            "duration": 4.2
+        },
+        {
+            "text": "Docker. Công cụ không thể thiếu nếu các",
+            "start": 1467.32,
+            "duration": 3.959
+        },
+        {
+            "text": "bạn muốn đi làm sau này không những",
+            "start": 1469.72,
+            "duration": 3.36
+        },
+        {
+            "text": "trong mảng AI mà trong bất kỳ một cái",
+            "start": 1471.279,
+            "duration": 3.201
+        },
+        {
+            "text": "nhánh con nào khác của công nghệ ông",
+            "start": 1473.08,
+            "duration": 4.16
+        },
+        {
+            "text": "tin. Và cuối cùng để bổ trợ cho những",
+            "start": 1474.48,
+            "duration": 5.199
+        },
+        {
+            "text": "bạn nào muốn theo đuổi mảng AI data",
+            "start": 1477.24,
+            "duration": 4.48
+        },
+        {
+            "text": "machining nhưng còn bị yếu về kiến thức",
+            "start": 1479.679,
+            "duration": 4.041
+        },
+        {
+            "text": "toán thì mình sẽ tiếp tục khai giảng",
+            "start": 1481.72,
+            "duration": 4.679
+        },
+        {
+            "text": "khóa học toán dành cho AI. Trong khóa",
+            "start": 1483.72,
+            "duration": 4.6
+        },
+        {
+            "text": "học này các bạn sẽ được học về bốn cái",
+            "start": 1486.399,
+            "duration": 3.76
+        },
+        {
+            "text": "mảng toán chính cần thiết dành cho bất",
+            "start": 1488.32,
+            "duration": 4.239
+        },
+        {
+            "text": "kỳ ai muốn theo đuổi AI, data science",
+            "start": 1490.159,
+            "duration": 5.52
+        },
+        {
+            "text": "machining bao gồm là xác suất, thống kê,",
+            "start": 1492.559,
+            "duration": 5.281
+        },
+        {
+            "text": "đại số tuyến tính và giải thích. Trong",
+            "start": 1495.679,
+            "duration": 3.961
+        },
+        {
+            "text": "quá trình học thay vì chỉ học những kiến",
+            "start": 1497.84,
+            "duration": 3.4
+        },
+        {
+            "text": "thức lý thuyết cũng như là làm những cái",
+            "start": 1499.64,
+            "duration": 3.44
+        },
+        {
+            "text": "bài tập khô khan thì mình cũng sẽ nói",
+            "start": 1501.24,
+            "duration": 3.36
+        },
+        {
+            "text": "cho các bạn biết là những kiến thức này",
+            "start": 1503.08,
+            "duration": 3.36
+        },
+        {
+            "text": "sau này các bạn sẽ được áp dụng như thế",
+            "start": 1504.6,
+            "duration": 4.679
+        },
+        {
+            "text": "nào trong quá trình học hay là làm về AI",
+            "start": 1506.44,
+            "duration": 5.16
+        },
+        {
+            "text": "datation machine learning. Nếu các bạn",
+            "start": 1509.279,
+            "duration": 4.801
+        },
+        {
+            "text": "quan tâm hay có bất kỳ một thắc mắc gì",
+            "start": 1511.6,
+            "duration": 4.24
+        },
+        {
+            "text": "về bất kỳ một cái khoa học nào của mình",
+            "start": 1514.08,
+            "duration": 2.88
+        },
+        {
+            "text": "các bạn có thể liên lạc với mình thông",
+            "start": 1515.84,
+            "duration": 2.839
+        },
+        {
+            "text": "qua số Zalo như các bạn có thể nhìn thấy",
+            "start": 1516.96,
+            "duration": 4.28
+        },
+        {
+            "text": "trên hình. M.",
+            "start": 1518.679,
+            "duration": 2.561
+        }
+    ]
+}
