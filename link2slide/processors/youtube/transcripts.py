@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from youtube_transcript_api import FetchedTranscript, YouTubeTranscriptApi
 
-from ..config import CFG
+from ...config import CFG
 from .cookies import build_session, list_cookie_files
 
 _VIDEO_ID_RE = re.compile(

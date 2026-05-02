@@ -4,8 +4,8 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 from youtube_transcript_api import YouTubeTranscriptApi
 
-from ....youtube.cookies import build_session, list_cookie_files
-from ....youtube.transcripts import extract_video_id
+from ....processors.youtube.cookies import build_session, list_cookie_files
+from ....processors.youtube.transcripts import extract_video_id
 
 
 def list_available_languages(url: str) -> str:

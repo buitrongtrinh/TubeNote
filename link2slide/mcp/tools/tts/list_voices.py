@@ -6,7 +6,7 @@ from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from ....tts.voices import list_voices as _list_voices
+from ....processors.tts.voices import list_voices as _list_voices
 
 
 def list_tts_voices(language: Optional[str] = None) -> str:

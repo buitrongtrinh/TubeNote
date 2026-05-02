@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import requests
 
-from ..config import CFG
+from ...config import CFG
 
 
 def _load_jar(path: Path) -> MozillaCookieJar:
@@ -25,8 +25,7 @@ def list_cookie_files() -> List[Path]:
     # Resolve cookies dir: ưu tiên CFG, fallback về ./cookies/ nếu folder tồn tại + có .txt
     cookies_dir = CFG.cookies.dir
     if cookies_dir is None:
-        from ..config import PROJECT_ROOT
-        fallback = PROJECT_ROOT / "cookies"
+        fallback = CFG.PROJECT_ROOT / "cookies"
         if fallback.is_dir() and any(fallback.glob("*.txt")):
             cookies_dir = fallback
 

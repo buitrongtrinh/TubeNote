@@ -5,7 +5,7 @@ from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from ....tts.synthesize import synthesize
+from ....processors.tts.synthesize import synthesize
 
 
 def synthesize_text_to_speech(

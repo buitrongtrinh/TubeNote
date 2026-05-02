@@ -6,7 +6,7 @@ import urllib.request
 
 from mcp.server.fastmcp import FastMCP
 
-from ....youtube.transcripts import extract_video_id
+from ....processors.youtube.transcripts import extract_video_id
 
 
 def get_video_metadata(url: str) -> str:

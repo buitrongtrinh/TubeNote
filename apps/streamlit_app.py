@@ -15,7 +15,7 @@ import streamlit as st
 
 from link2slide.agents.summarizer import summarize
 from link2slide.config import CFG
-from link2slide.youtube.cookies import list_cookie_files
+from link2slide.processors.youtube.cookies import list_cookie_files
 import os
 
 def _collect_error_text(e: BaseException, _seen: set | None = None) -> str:

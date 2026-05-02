@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from ....youtube.transcripts import fetch_transcript
+from ....processors.youtube.transcripts import fetch_transcript
 
 
 def get_youtube_transcript(

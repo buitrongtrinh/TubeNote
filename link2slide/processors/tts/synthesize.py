@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from ..config import CFG, PROJECT_ROOT
+from ...config import CFG, PROJECT_ROOT
 
 
 DEFAULT_VOICE_VI = "vi-VN-HoaiMyNeural"     # nữ, miền Bắc
