@@ -1,12 +1,27 @@
+# Core
 python-dotenv
 pyyaml
-youtube-transcript-api
-mcp
+requests
+
+# LLM framework
 langchain
 langchain-core
-langgraph
-langchain-mcp-adapters
+langchain_text_splitters
+langchain_community            # BM25Retriever
+langchain_chroma               # vector store
+
+# LLM providers
 langchain-google-genai
 langchain-openai
 langchain-anthropic
+langchain_ollama
+
+# Retrieval — sparse
+rank_bm25
+
+# YouTube + transcript
+yt-dlp
+openai-whisper                 # STT fallback khi không có manual subtitle
+
+# UI
 streamlit

@@ -1,341 +1,193 @@
-# 🎬 Link2Slide
+# 📓 TuBeNote
 
-> Agent tóm tắt video YouTube + đọc thành audio. Multi-LLM cloud (Gemini / OpenAI / Anthropic), Multi-tool MCP (transcript, metadata, **TTS**). UI Streamlit.
+> Vietnamese-first AI assistant for **chatting with YouTube videos** — summarize + memory-aware Q&A. Multi-LLM (Gemini / OpenAI / Anthropic / Ollama), Hybrid RAG (Dense + BM25), Whisper STT fallback, hybrid web search.
 
-**Chi phí 0đ** với Gemini free tier + Edge TTS + cookies cá nhân. Test trên Windows 11, Python 3.10.
+Near-zero cost with Gemini free tier + local Ollama embedding + personal cookies. Tested on Windows 11 + RTX 4050 6GB.
 
-> ⚠️ **Đang phát triển:** TTS tool (text → speech) đang ở giai đoạn skeleton. Phụ đề + tóm tắt đã hoạt động ổn.
-
----
-
-## 📺 Demo
-
-[![Link2Slide demo](https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
-
-▶️ **https://youtu.be/dQw4w9WgXcQ**
-
-### Sample output
-
-```markdown
-📺 **Jack Ma: You're Supposed to Spend Money on Your People**
-👤 Kênh: [World Economic Forum](https://www.youtube.com/@wef)
-![thumbnail](https://i.ytimg.com/vi/WsQ7ysVt-0A/hqdefault.jpg)
+> ⚠️ **Work in progress:** Vietsub burn-in and TTS dubbing are experimental and **not shipped in this release**. See roadmap below.
 
 ---
 
-**Chủ đề**: Jack Ma chia sẻ về cuộc gặp với Donald Trump...
+## ✨ Features
 
-**Ý chính**:
-- Cuộc gặp "rất hiệu quả" với Tổng thống đắc cử...
-- Cam kết tạo 1 triệu việc làm tại Mỹ qua Alibaba...
-
-**Kết luận**: ...
-
-🔊 [audio_summary.mp3]  ← TTS narration (đang triển khai)
-```
-
----
-
-## ✨ Tính năng
-
-| | Status |
+| Feature | Description |
 |---|---|
-| 🤖 Multi-LLM (`google` / `openai` / `anthropic`) | ✅ Done |
-| 🔌 MCP stdio server, mỗi tool 1 file, auto-register | ✅ Done |
-| 📺 YouTube transcript + time-range + cookie rotation | ✅ Done |
-| 📋 Video metadata (title, channel, thumbnail) | ✅ Done |
-| 🌐 Fallback ngôn ngữ + auto-translate | ✅ Done |
-| 🖥️ Streamlit UI với event streaming | ✅ Done |
-| 🔊 **TTS — đọc tóm tắt thành audio** | 🚧 In progress |
-| 🎵 Voice picker (vi/en, nam/nữ) | 🚧 In progress |
-| 🎤 Whisper STT cho video không phụ đề | 📅 Planned |
+| 📺 **Video summarization** | Paste a YouTube link → AI summarizes in Vietnamese (topic, key points, highlights, conclusion) |
+| 💬 **Memory-aware Q&A** | Chat about the video with a 10-message sliding-window memory |
+| 🔍 **Hybrid RAG** | Dense (Chroma + qwen3-embedding) + Sparse (BM25) + RRF fusion |
+| 🌐 **Hybrid web search** | Self-hosted SearXNG; auto-triggers when RAG relevance is low |
+| 🤖 **Multi-LLM** | Switch between Gemini / OpenAI / Anthropic / Ollama in the UI |
+| 🎙️ **Whisper STT fallback** | Prefer yt-dlp manual subtitles; fall back to Whisper `base.en` / `base` multilingual |
+| 🍪 **Cookie rotation** | Upload `cookies.txt` via the UI, or set `YT_COOKIES_PATH` in `.env` |
 
 ---
 
-## 🏗️ Kiến trúc
+## 🧱 Tech stack
 
-```
-┌──────────────┐
-│ Streamlit UI │ ─┐
-└──────────────┘  │
-┌──────────────┐  │     ┌───────────────┐        ┌──────────────────────────┐
-│  CLI         │ ─┼──▶ │ Summarizer     │ ─tools▶│ MCP Server (stdio)       │
-└──────────────┘  │     │ Agent          │        │  ├ youtube/              │
-                  │     │ (LangGraph)    │        │  │  ├ transcript         │
-                  │     └───────┬────────┘        │  │  ├ metadata           │
-                  │             │                 │  │  └ languages          │
-                  │             │ LLM             │  └ tts/  🚧              │
-                  │             ▼                 │     ├ synthesize         │
-                  │     ┌───────────────┐        │     └ list_voices        │
-                  │     │ make_llm()    │        └─────────────┬────────────┘
-                  │     │  • google     │                      │
-                  │     │  • openai     │        ┌─────────────▼────────────┐
-                  │     │  • anthropic  │        │ Data layer:              │
-                  │     └───────────────┘        │  ├ youtube/              │
-                  │                              │  │  ├ transcripts.py     │
-┌─────────────────┴──┐                           │  │  └ cookies.py         │
-│ mcp_cli (debug)    │                           │  └ tts/                  │
-└────────────────────┘                           │     ├ synthesize.py 🚧   │
-                                                 │     └ voices.py     🚧   │
-                                                 └──────────────────────────┘
-```
+| Layer | Choice |
+|---|---|
+| **UI** | Streamlit |
+| **LLM** | LangChain — Google Gemini / OpenAI / Anthropic / Ollama |
+| **Vector store** | Chroma (cosine similarity) |
+| **Embedding** | Ollama `qwen3-embedding:0.6b` (1024-dim, multilingual VN + EN) |
+| **Sparse retrieval** | `rank_bm25` |
+| **Fusion** | Reciprocal Rank Fusion (RRF, k=60) |
+| **Transcript** | `yt-dlp` (manual subs) → `openai-whisper` (STT fallback) |
+| **Web search** | Self-hosted SearXNG via Docker Compose |
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quick start
 
-```powershell
-# 1. Clone + venv
-git clone <repo>
-cd Link2Slide
-py -3.10 -m venv .venv
-.venv\Scripts\activate
+### 1. Requirements
+
+- **Python 3.10+**
+- **[Ollama](https://ollama.com/download)** — required for embedding (the app auto-starts the daemon if not running)
+- **Docker** (optional) — only needed for SearXNG web search
+
+### 2. Setup
+
+```bash
+# Clone + virtualenv
+git clone https://github.com/buitrongtrinh/TubeNote.git TuBeNote
+cd TuBeNote
+python -m venv .venv
+.venv\Scripts\activate          # Windows; on Linux/Mac: source .venv/bin/activate
 pip install -r requirements.txt
 
-# 2. API key Gemini (free)
-copy .env.example .env
-notepad .env
-# → GOOGLE_API_KEY=AIza... (lấy tại https://aistudio.google.com/apikey)
+# Pull the Ollama embedding model (one-time)
+ollama pull qwen3-embedding:0.6b
 
-# 3. Cookies YouTube (khuyến nghị — tránh bị block IP)
-# → Cài extension "Get cookies.txt LOCALLY" trên Chrome
-# → Login youtube.com, export → lưu vào cookies\primary.txt
-
-# 4. Chạy
-streamlit run apps\streamlit_app.py
+# Create .env from template
+cp .env.example .env
+# Edit .env and set GOOGLE_API_KEY (Gemini free tier: https://aistudio.google.com/apikey)
 ```
+
+### 3. Run
+
+```bash
+streamlit run apps/streamlit_app.py
+```
+
+The app opens at `http://localhost:8501`. Paste a YouTube link → summary is generated automatically → chat freely.
+
+### 4. Web search (optional)
+
+```bash
+docker compose up -d            # starts SearXNG on port 8888
+```
+
+In the Streamlit sidebar, switch the "🌐 Web search" radio to **Auto** or **Always**.
 
 ---
 
-## 📁 Cấu trúc project
+## ⚙️ Configuration
 
-```
-Link2Slide/
-├── config.yaml / .env / requirements.txt
-├── cookies/                              # cookies/*.txt (rotation)
-├── output/audio/                         # 🆕 file MP3 do TTS sinh ra
-├── apps/                                 # entrypoints
-│   ├── cli.py
-│   ├── mcp_cli.py
-│   ├── mcp_server.py
-│   └── streamlit_app.py
-└── link2slide/
-    ├── config.py
-    ├── prompts.py
-    ├── llm/                              # provider factory
-    │   ├── __init__.py
-    │   ├── google.py / openai.py / anthropic.py
-    ├── agents/summarizer.py              # LangGraph ReAct agent
-    ├── mcp/
-    │   ├── client.py / server.py
-    │   └── tools/
-    │       ├── __init__.py               # auto-discover domain
-    │       ├── youtube/                  # ✅ done
-    │       │   ├── __init__.py
-    │       │   ├── transcript.py
-    │       │   ├── metadata.py
-    │       │   └── languages.py
-    │       └── tts/                      # 🚧 đang triển khai
-    │           ├── __init__.py
-    │           ├── synthesize.py         # MCP tool: synthesize_text_to_speech
-    │           └── list_voices.py        # MCP tool: list_tts_voices
-    ├── youtube/                          # YouTube data layer
-    │   ├── cookies.py
-    │   └── transcripts.py
-    └── tts/                              # 🚧 TTS data layer
-        ├── synthesize.py                 # pure logic — gọi edge-tts/gTTS
-        └── voices.py                     # list voices
-```
+### `config.yaml`
 
----
+All non-secret settings. Three important sections:
 
-## 🔧 Triển khai TTS — cấu trúc mong đợi
-
-### File 1: `link2slide/tts/synthesize.py` (data layer, pure)
-
-```python
-"""TTS pure logic. Provider khuyến nghị: edge-tts (free, có giọng Việt)."""
-from pathlib import Path
-import asyncio
-import edge_tts                           # pip install edge-tts
-
-DEFAULT_VOICE_VI = "vi-VN-HoaiMyNeural"
-
-async def _synthesize_edge_tts(text: str, voice: str, out_path: Path) -> None:
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(str(out_path))
-
-def synthesize(text: str, voice: str = None, output_path: Path = None) -> Path:
-    """Sinh file MP3 từ text. Trả về path file đã tạo."""
-    voice = voice or DEFAULT_VOICE_VI
-    out = output_path or _make_default_path()
-    asyncio.run(_synthesize_edge_tts(text, voice, out))
-    return out
-```
-
-### File 2: `link2slide/tts/voices.py`
-
-```python
-"""List voices từ provider."""
-import asyncio
-import edge_tts
-
-def list_voices(language: str = None) -> list[dict]:
-    voices = asyncio.run(edge_tts.list_voices())
-    if language:
-        voices = [v for v in voices if v["Locale"].startswith(language)]
-    return voices
-```
-
-### File 3: `link2slide/mcp/tools/tts/synthesize.py` (MCP wrapper)
-
-```python
-"""MCP tool — wrap pure logic thành tool LLM gọi được."""
-from mcp.server.fastmcp import FastMCP
-from ....tts.synthesize import synthesize
-
-def synthesize_text_to_speech(text: str, voice: str = None) -> str:
-    """Convert text to MP3. Returns absolute file path."""
-    return str(synthesize(text=text, voice=voice))
-
-def register(mcp: FastMCP) -> None:
-    mcp.tool()(synthesize_text_to_speech)
-```
-
-### File 4: `link2slide/mcp/tools/tts/list_voices.py`
-
-```python
-"""MCP tool — list voices."""
-import json
-from mcp.server.fastmcp import FastMCP
-from ....tts.voices import list_voices
-
-def list_tts_voices(language: str = None) -> str:
-    """Returns JSON list of voices."""
-    return json.dumps(list_voices(language), ensure_ascii=False, indent=2)
-
-def register(mcp: FastMCP) -> None:
-    mcp.tool()(list_tts_voices)
-```
-
-### File 5: `link2slide/mcp/tools/tts/__init__.py`
-
-```python
-"""Domain hub — gọi register cho từng tool."""
-from . import list_voices, synthesize
-
-def register(mcp):
-    synthesize.register(mcp)
-    list_voices.register(mcp)
-```
-
-### Flow cuối
-
-1. `tools/__init__.py::register_all()` scan folder → thấy domain `tts/`
-2. Import `tts/__init__.py` → gọi `tts.register(mcp)`
-3. `tts.register()` gọi `synthesize.register(mcp)` + `list_voices.register(mcp)`
-4. Mỗi tool đăng ký vào FastMCP → agent thấy thêm 2 tool
-
-**Pattern này đồng nhất với folder `youtube/`** — không sửa file ngoài, chỉ thêm folder mới.
-
-### Update prompt để agent dùng TTS
-
-Trong [link2slide/prompts.py](link2slide/prompts.py), thêm section:
-
-```
-"4. Sau khi viết xong tóm tắt: nếu user yêu cầu 'đọc', 'audio', 'voice' "
-"→ gọi synthesize_text_to_speech(text=<bản tóm tắt>) → đính kèm path MP3 vào output."
-```
-
----
-
-## ⚙️ Cấu hình
-
-**`.env`** — secrets:
-```ini
-GOOGLE_API_KEY=AIza...
-# OPENAI_API_KEY=sk-...
-# ANTHROPIC_API_KEY=sk-ant-...
-YT_COOKIES_DIR=cookies
-```
-
-**`config.yaml`** — defaults:
 ```yaml
 llm:
-  provider: google
+  provider: local                          # default: gemini / openai / anthropic / local
   google:
-    model: gemini-2.5-flash
+    models: [gemini-2.5-flash-lite, ...]   # priority list — first entry is the default
+  local:
+    models: [llama3.2:latest]
+    base_url: http://localhost:11434
 
-transcript:
-  default_languages: [vi, en]
+rag:
+  similarity_threshold: 0.55               # cosine threshold for Dense
+  fetch_k: 30                              # pool size per retriever (RRF input)
+  final_k: 10                              # cap on chunks sent to the LLM (RRF output)
 
-tts:                              # 🚧 TTS config
-  provider: edge_tts              # edge_tts | gtts | openai | elevenlabs
-  default_voice: vi-VN-HoaiMyNeural
-  output_dir: output/audio
+embedding:
+  model: qwen3-embedding:0.6b              # project-locked — changing requires wiping output/chroma/
+```
 
-agent:
-  max_iterations: 6
+### `.env`
+
+API keys + paths. See `.env.example` for the supported variables.
+
+---
+
+## 🏗️ Architecture
+
+```
+YouTube URL
+   ↓
+[fetch metadata]  ← yt-dlp
+   ↓
+[fetch transcript]
+   ├─ yt-dlp manual subtitle (preferred)
+   └─ Whisper STT fallback (base.en / base multilingual, language auto-detected from title)
+   ↓
+   ┌────────────────┬────────────────┐
+   ↓                ↓                ↓
+[summary]      [chunking]      (Streamlit render)
+LLM 1 call    RecursiveSplitter
+              chunk=500 / overlap=100
+                   ↓
+              [embed via Ollama qwen]
+                   ↓
+              [Chroma store]
+                   ↓
+              (ready for chat)
+
+Q&A:
+question → [Dense Chroma top-30] ─┐
+        → [BM25 top-30]            ├─→ [RRF fuse] → top-10 → [LLM answer]
+        → (optional web search)   ─┘
 ```
 
 ---
 
-## 💻 Sử dụng
+## 🗺️ Roadmap
 
-```powershell
-# CLI
-python -m apps.cli "https://youtu.be/VIDEO_ID"
-python -m apps.cli "https://youtu.be/VIDEO_ID" "Chỉ tóm tắt 5 phút đầu"
+- [ ] **Vietsub burn-in** — generate `.srt` and mux into the video via ffmpeg
+- [ ] **Audio dubbing** — Whisper segments → translate → TTS → mux
+- [ ] **Multi-video research mode** — synthesize content across multiple videos
+- [ ] **Timestamp-aware citations** — link `(per video, 2:30)` → `youtu.be/...?t=150s`
+- [ ] **Streaming LLM responses** — token-by-token output instead of waiting for full response
+- [ ] **AI Agent mode** — ReAct loop with tool use
 
-# Streamlit UI
-streamlit run apps\streamlit_app.py
+---
 
-# Debug MCP tool trực tiếp
-python -m apps.mcp_cli list
-python -m apps.mcp_cli call get_youtube_transcript url="https://youtu.be/VIDEO_ID" end_seconds=300
+## 📁 Project structure
 
-# (Sau khi triển khai TTS)
-python -m apps.mcp_cli call synthesize_text_to_speech text="Xin chào" voice=vi-VN-NamMinhNeural
-python -m apps.mcp_cli call list_tts_voices language=vi
+```
+tubenote/
+  config.py                       # YAML + .env loader
+  ollama_runtime.py               # auto-start Ollama daemon
+  llm/providers/                  # google, openai, anthropic, local builders
+  pipeline/
+    summarizer.py                 # video → summary
+    qa.py                         # RAG + memory + web search
+  processors/
+    youtube/
+      transcript.py               # orchestrator: yt-dlp → Whisper fallback
+      transcript_yt_dlp.py        # manual sub fetcher + metadata
+      transcript_whisper.py       # Whisper STT (base.en / base multilingual)
+      cookies.py, utils.py, types.py
+    rag/
+      chunker.py                  # 500-char chunks, 100 overlap
+      embedder.py                 # Ollama qwen3-embedding client
+      store.py                    # Chroma store + get_all_docs (for BM25)
+      pipeline.py                 # ingest = fetch → chunk → embed → store
+    web/
+      searxng.py                  # JSON API client
+
+apps/
+  streamlit_app.py                # main UI
+  qa.py                           # CLI Q&A
+  stop_services.py                # stop Docker + Ollama
+
+searxng_config/                   # SearXNG settings
+docker-compose.yml                # SearXNG service definition
 ```
 
 ---
 
-## 🔧 Mở rộng — thêm domain tool mới
+## 📄 License
 
-Theo pattern domain folder (giống `youtube/`, `tts/`):
-
-```
-link2slide/mcp/tools/<domain>/
-├── __init__.py          # register tất cả tool con
-├── tool_a.py            # def tool_a(...) + def register(mcp)
-└── tool_b.py
-```
-
-Server tự discover folder mới. Không cần sửa `server.py`.
-
----
-
-## ⚠️ Hạn chế
-
-- Chỉ chạy với video **có phụ đề**. Roadmap: Whisper + yt-dlp cho video không phụ đề.
-- Cookies TTL **2–8 tuần** → export lại định kỳ.
-- Free tier Gemini ~10 RPM, **20 RPD** cho `gemini-2.5-flash`. Hết quota → đổi `gemini-2.5-flash-lite` (~1000 RPD) hoặc bật billing.
-
----
-
-## 🐛 Troubleshooting
-
-| Lỗi | Fix |
-|---|---|
-| `ModuleNotFoundError: link2slide` (Streamlit) | Chạy từ project root: `streamlit run apps\streamlit_app.py` |
-| `RequestBlocked` (transcript) | Set cookies `cookies\primary.txt`, hoặc chờ 30–60p |
-| `RESOURCE_EXHAUSTED` (Gemini) | Hết quota free tier — đổi model hoặc đợi reset (PT timezone) |
-| `Thiếu GOOGLE_API_KEY` | Set `.env` hoặc nhập trong sidebar Streamlit |
-| TTS fail (sau khi triển khai) | `pip install edge-tts`. Test: `python -c "import edge_tts"` |
-
----
-
-## 📜 License
-
-MIT — dùng tự do, không bảo hành.
+MIT.

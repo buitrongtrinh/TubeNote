@@ -1,0 +1,21 @@
+# TubeNote services — chạy 1 lần, để chạy ngầm.
+#
+# Usage:
+#   docker compose up -d        # start (lần đầu pull image ~150 MB)
+#   docker compose ps           # status
+#   docker compose logs -f      # xem log
+#   docker compose down         # stop + remove containers
+#   docker compose stop         # chỉ stop (giữ container)
+#   docker compose start        # start lại sau khi stop
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: tubenote-searxng
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./searxng_config:/etc/searxng:rw
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8888/

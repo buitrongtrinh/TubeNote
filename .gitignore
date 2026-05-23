@@ -7,56 +7,55 @@
 
 # Cookies YouTube — chứa session login cá nhân
 cookies/*.txt
-*_cookies.txt
 !cookies/.gitkeep
 
+# Streamlit secrets
+.streamlit/secrets.toml
+
 # ==============================================================================
-# Build / runtime artifacts
+# Runtime output — code tự tạo (os.makedirs)
 # ==============================================================================
-# TTS output / audio binaries
-output/audio/*.mp3
-output/audio/*.wav
-output/audio/*.ogg
-!output/audio/.gitkeep
+output/
+chroma_langchain_db/             # legacy vector store từ notebook era
+
+# ==============================================================================
+# Vietsub / TTS experiments — chưa ready để push
+# ==============================================================================
+TTS_model_demo/
+translate_sub_demo/
+
+# Dev test files / one-off scripts
+tmp/
+
+# ==============================================================================
+# Media binaries (preventive — Whisper download audio, vd .m4a)
+# ==============================================================================
 *.wav
 *.mp3
-*.ogg
-*.flac
+*.m4a
+*.mp4
+*.mkv
 
-# Personal experiments / models / notebooks (không phải code production)
-TTS_model/
-*.ipynb
-*.ipynb_checkpoints/
-test_*.py
-
+# ==============================================================================
 # Python
+# ==============================================================================
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Virtual env
 .venv/
-venv/
-env/
 
 # ==============================================================================
-# IDE / Editor
+# SearXNG runtime (commit chỉ settings.yml; uwsgi/limiter là runtime)
 # ==============================================================================
-.idea/
-.vscode/
-*.swp
-*.swo
+searxng_config/uwsgi.ini
+searxng_config/limiter.toml
+
+# ==============================================================================
+# OS / IDE noise (preventive)
+# ==============================================================================
 .DS_Store
 Thumbs.db
-
-# ==============================================================================
-# Streamlit
-# ==============================================================================
-.streamlit/secrets.toml
+.vscode/
+.idea/
 
 # ==============================================================================
 # Claude / AI tooling

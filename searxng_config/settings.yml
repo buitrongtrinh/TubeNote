@@ -1,0 +1,17 @@
+# SearXNG settings cho TubeNote — config local-only, commit OK.
+#
+# Inherits từ image defaults; override những thứ TubeNote cần:
+#   - secret_key: local-only, không phải security-sensitive
+#   - server.limiter: tắt để Python client gọi API không bị 429
+#   - search.formats: thêm 'json' để app parse được
+
+use_default_settings: true
+
+server:
+  secret_key: "tubenote-local-not-secret"
+  limiter: false
+
+search:
+  formats:
+    - html
+    - json
