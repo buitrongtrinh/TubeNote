@@ -1,5 +1,11 @@
 # TubeNote
 
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Demo-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 TubeNote is a local-first AI video dubbing and video Q&A application. It turns a
 YouTube video into a Vietnamese dubbed video, keeps editable subtitles and timing
 metadata, and adds a RAG chat panel so users can ask questions about the video.
@@ -13,13 +19,15 @@ over processed transcripts.
 
 ## Demo
 
-| Demo | Link |
-| --- | --- |
-| GUI walkthrough | [Watch on YouTube](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) |
-| Dubbed output sample | [Watch on YouTube](https://www.youtube.com/watch?v=YOUR_DUBBED_OUTPUT_VIDEO_ID) |
+Click a thumbnail to watch on YouTube:
 
-Replace the placeholder links above with your own public demo videos before
-publishing the repository.
+| GUI walkthrough | Dubbed output sample |
+| :---: | :---: |
+| [![GUI walkthrough](https://img.youtube.com/vi/YOUR_GUI_DEMO_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) | [![Dubbed output sample](https://img.youtube.com/vi/YOUR_DUBBED_OUTPUT_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_DUBBED_OUTPUT_VIDEO_ID) |
+
+<!-- Replace YOUR_GUI_DEMO_VIDEO_ID / YOUR_DUBBED_OUTPUT_VIDEO_ID (3 places:
+     the badge on top and the two thumbnails) with real YouTube video ids
+     before publishing. -->
 
 ## What TubeNote Does
 
