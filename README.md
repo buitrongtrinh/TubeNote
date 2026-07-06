@@ -4,6 +4,7 @@
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Hardware](https://img.shields.io/badge/Hardware-CPU--only%20OK%20%7C%20GPU%20optional-2ea44f)](#prerequisites)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 TubeNote is a local-first AI video dubbing and video Q&A application. It turns a
@@ -14,6 +15,10 @@ The project is built as a practical full-stack system around video localization:
 subtitle acquisition, ASR fallback, duration-aware translation, TTS generation,
 speech/subtitle alignment, background audio preservation, and hybrid retrieval
 over processed transcripts.
+
+**The entire pipeline runs on a CPU-only machine** (faster-whisper `small.en`
+int8 + Supertonic TTS). An NVIDIA GPU is optional and unlocks the
+higher-quality path: OmniVoice TTS with voice cloning and `medium.en` ASR.
 
 ![TubeNote detailed architecture](docs/assets/tubenote-architecture.webp)
 
