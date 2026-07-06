@@ -1,0 +1,291 @@
+# ==============================================================================
+# TubeNote — cấu hình non-secret.
+# Secret (API key, cookies) để trong .env.
+# ==============================================================================
+
+llm:
+  # Provider mặc định. Override bằng env LLM_PROVIDER hoặc UI.
+  provider: deepseek
+
+  # ``models`` là list options cho UI dropdown. Model **đầu tiên** = default
+  # khi gọi ``make_llm()`` không kèm ``model=``. User pick cụ thể trong UI.
+
+  google:
+    models:
+      - gemini-3.5-flash
+      - gemini-3.1-pro-preview
+      - gemini-3-flash-preview
+      - gemini-3.1-flash-lite
+      - gemini-2.5-flash-lite
+      - gemini-2.5-flash
+      - gemini-2.5-pro
+    temperature: 0.3
+    timeout: 120
+    max_retries: 2
+
+  openai:
+    models:
+      - gpt-5.5
+      - gpt-5.4
+      - gpt-5.4-mini
+      - gpt-5.4-nano
+      - gpt-4o
+      - gpt-4o-mini
+    temperature: 0.3
+    timeout: 120
+    max_retries: 2
+
+  deepseek:
+    models:
+      - deepseek-v4-flash
+      - deepseek-v4-pro
+    base_url: https://api.deepseek.com
+    temperature: 0.2
+    timeout: 120
+    max_retries: 2
+
+  anthropic:
+    models:
+      - claude-opus-4-6
+      - claude-sonnet-4-6
+      - claude-haiku-4-5
+    temperature: 0.3
+    timeout: 120
+    max_retries: 2
+
+transcript:
+  # Thứ tự ngôn ngữ ưu tiên khi fetch phụ đề.
+  default_languages: [vi, en]
+
+cookies:
+  # KHÔNG set ở đây để giữ rule "single source of truth" trong .env.
+  # Bật cookies bằng YT_COOKIES_DIR / YT_COOKIES_PATH trong .env.
+  dir: null
+  single_file: null
+
+
+agent:
+  max_iterations: 6
+
+rag:
+  # Relevance threshold sau khi normalize cosine distance về [0, 1].
+  # Mapping: 1.0 = identical, 0.5 = orthogonal (no relation), 0.0 = opposite.
+  # Tune dựa trên embedder thực tế:
+  #   - nomic-embed-text-v2-moe: dùng 0.55-0.65 (model này cosine sim hơi conservative)
+  #   - bge-m3 / nomic: dùng 0.6-0.7
+  similarity_threshold: 0.55
+  # Hybrid retrieval pool: mỗi retriever (Dense + BM25) fetch top-N này để fuse.
+  # Pool rộng → RRF có cơ hội "cứu" chunks 1 retriever rank thấp nhưng cái kia rank cao.
+  fetch_k: 30
+  # Sau khi RRF fuse 2 ranking, cap top-N gửi LLM (final_k < fetch_k).
+  final_k: 10
+  # Nếu KHÔNG chunk nào vượt similarity_threshold → Dense fallback top-N.
+  fallback_k: 3
+
+embedding:
+  # Local embedding loaded by LangChain/SentenceTransformers.
+  # Đổi model bắt buộc xóa data/chroma/* vì dim/vector space thay đổi.
+  provider: huggingface
+  model: BAAI/bge-m3
+  # RAG embedding chạy CPU để không tranh VRAM với Whisper/TTS.
+  device: cpu
+  normalize: true
+  # Model đã được cache local; tránh gọi HF Hub mỗi lần start backend.
+  local_files_only: true
+web_search:
+  # SearXNG self-hosted (Docker). Bật JSON format trong searxng/settings.yml.
+  # Setup: `docker run -d -p 8888:8080 --name searxng searxng/searxng`
+  enabled: true
+  base_url: http://localhost:8888
+  max_results: 5
+  # Threshold cho "auto" mode: top RAG score < này → call web.
+  # 1.0 = identical, 0.5 = orthogonal (no relation), 0.0 = opposite.
+  auto_threshold: 0.55
+
+ui:
+  title: "TubeNote"
+  page_icon: "📓"
+  caption: "Chat với video YouTube — tóm tắt + Q&A có nhớ context. Multi-LLM (DeepSeek / Gemini / OpenAI / Anthropic)."
+
+paths:
+  audio_dir: data/audio
+  video_dir: data/video
+  metadata_dir: data/metadata
+  subtitles_dir: data/subtitles
+  video_sub_dir: data/video_sub
+  chroma_dir: data/chroma
+  # Glossary người dùng: dạng viết → dạng đọc cho TTS (ví dụ "RAG": "rác").
+  glossary_file: data/glossary.json
+
+whisper:
+  # STT fallback khi yt-dlp không lấy được subtitle gốc.
+  # faster-whisper dùng CTranslate2, nhanh/nhẹ hơn openai-whisper.
+  engine: faster
+  default_preset: cpu
+  # Dựng lại "câu" từ mốc thời gian TỪNG TỪ (word_timestamps) thay vì dùng
+  # thẳng ranh giới segment thô của Whisper — Whisper không tách segment
+  # theo pause thật nên có thể dính 2 câu làm 1 hoặc lệch mốc đầu/cuối.
+  # Preset nào tắt word_timestamps sẽ tự rơi về hành vi cũ (dùng nguyên
+  # segment.text/start/end). Xem transcript_whisper.py::_split_into_entries.
+  sentence_pause_alpha: 0.02   # giây; gap giữa 2 từ >= ngưỡng này -> cắt câu mới
+  sentence_max_words: 20        # giới hạn cứng số từ/câu khi không có pause/dấu phẩy để cắt; đặt 0 để tắt (không cắt cứng theo số từ)
+  sentence_min_words: 2        # câu tách ra ít hơn ngần này từ (vd 1 từ đứng riêng) sẽ tự gộp vào câu liền kề gần hơn về thời gian
+  presets:
+    cpu:
+      label: Whisper - CPU
+      description: Tương thích máy không có GPU; small.en + CPU int8.
+      engine: faster
+      model: small.en
+      language: en
+      device: cpu
+      compute_type: int8
+      batch_size: 4
+      beam_size: 5
+      cpu_threads: 8
+      num_workers: 2
+      progressive: true
+      word_timestamps: true
+    gpu:
+      label: Whisper - GPU
+      description: Chất lượng cao, dùng GPU; medium.en + CUDA float16.
+      engine: faster
+      model: medium.en
+      language: en
+      device: cuda
+      compute_type: float16
+      batch_size: 4
+      beam_size: 5
+      progressive: true
+      word_timestamps: true
+  # Fallback cũ cho openai-whisper nếu đổi engine/preset về "openai".
+  vi_model: openai/whisper-large-v3-turbo
+  en_model: openai/whisper-large-v3-turbo
+  # Vocab hint để giữ acronyms English thay vì transliterate sang VN
+  initial_prompt: >-
+    Video kỹ thuật về AI, machine learning, prompt engineering.
+    Các thuật ngữ thường gặp: LLM, MCP, API, RAG, embedding, prompt,
+    vector database, fine-tune, transformer, Claude, Gemini, ChatGPT,
+    GPT-4, Llama, OpenAI, Anthropic, Hugging Face, npm, Python, Docker.
+
+translation:
+  # Model dịch transcript → tiếng Việt segment-by-segment (giữ timestamps)
+  model: gemini-2.5-flash-lite
+  # Batch thủ công: copy prompt sang ChatGPT. 50 vẫn ổn vì người dùng tự kiểm tra.
+  manual_batch_size: 80
+  # Batch API: nhỏ hơn để giảm lỗi thiếu/thừa dòng khi model trả về.
+  api_batch_size: 25
+  api_min_batch_size: 5
+  api_max_chars_per_batch: 4000
+  api_concurrency: 8
+  api_job_timeout_sec: 300
+
+subtitle:
+  # CSS ``::cue { font-size: X% }`` cho subtitle preview/player.
+  font_size_pct: 60
+  # CSS ``::cue { background: rgba(0,0,0, X) }`` opacity nền sau text (0.0 - 1.0)
+  bg_alpha: 0.7
+
+tts:
+  # Supertonic voice/model name. Có thể override default bằng env TTS_MODEL.
+  # Thêm voice hợp lệ vào đây để frontend hiện trong dropdown.
+  default_model: M5
+  models:
+    - M5
+    - F5
+
+  # Tham số tuning riêng cho engine Supertonic (CPU). Trước đây nằm hardcode
+  # trong backend/pipeline/dubbing.py::TTS_POLICIES — gom về đây để có 1 nơi
+  # duy nhất chỉnh mà không cần sửa code.
+  supertonic:
+    # Số bước khử nhiễu; UI cho chọn 5/8/12 (nhanh/cân bằng/chất lượng).
+    num_step: 8
+    # Giới hạn nén WSOLA trước khi chuyển sang ffmpeg atempo (audio_fit.py).
+    wsola_limit: 1.05
+    # Hệ số an toàn khi tính speed thích ứng theo từng câu
+    # (engines/supertonic.py::adaptive_speed). >1 nghĩa là chỉ yêu cầu nói
+    # nhanh gần đủ mức cần, phần dư nhường cho WSOLA/atempo.
+    speed_alpha: 1.2
+    # Gộp segment liền kề nếu tổng ký tự <= giá trị này (0 = không gộp).
+    merge_max_chars: 20
+    # Tốc độ phát lại cuối cùng của video xuất ra (retime, không phải TTS speed).
+    output_speed: 1.0
+
+  omnivoice:
+    # Model checkpoint/Hugging Face repo id. Override bằng env OMNIVOICE_MODEL.
+    # Dependency nằm trong requirements.txt; GPU build của PyTorch có thể cần
+    # cài riêng theo phần cứng trước khi cài requirements.
+    default_model: k2-fsa/OmniVoice
+    models:
+      - k2-fsa/OmniVoice
+    # Số bước khử nhiễu; UI cho chọn 16/24/32/48.
+    num_step: 32
+    wsola_limit: 1.05
+    # Số câu gộp vào 1 lần gọi generate() (throughput GPU).
+    batch_size: 4
+    # Tắt để dùng thẳng audio thô (debug); mặc định luôn fit về đúng slot.
+    fit_audio: true
+    # Hệ số an toàn khi tính phần "dư" cộng vào generation_duration
+    # (engines/omnivoice.py::_generation_slot_seconds) — thay cho hằng số
+    # +3s cũ, giờ tính theo độ dài thật của câu so với slot.
+    generation_delta_alpha: 1.2
+    # Sàn delta cho câu đã đủ/thưa ngân sách (giây).
+    generation_delta_min: 0.3
+    merge_max_chars: 0
+    output_speed: 1.0
+    postprocess_output: false
+    budget:
+      # Prompt gốc đang dùng [≤N tiếng] với N = duration * source_units_per_sec.
+      source_units_per_sec: 6.0
+      # Chỉ dùng để hiện gợi ý khoảng dưới trong prompt, không chặn backend.
+      min_units_per_sec: 3.2
+      # Tốc độ nói tự nhiên dùng để ước tính giây/phần dư (duration_budget.py).
+      target_units_per_sec: 4.5
+      # Ngưỡng nền trước khi cộng dung sai.
+      max_units_per_sec: 5.2
+      # Dung sai cộng thêm theo số tiếng tối đa nền.
+      tolerance_ratio: 0.4
+      # Sàn dung sai cộng thêm, tính theo số tiếng.
+      tolerance_min: 3
+    voices:
+      - id: academic_male
+        label: Giọng nam
+        reference_audio: voice_clones/omnivoice/academic_male.wav
+        reference_text: Trong machine learning, gradient descent là một thuật toán tối ưu hóa được sử dụng để tìm cực tiểu của một hàm mất mát.
+      - id: academic_female
+        label: Giọng nữ
+        reference_audio: voice_clones/omnivoice/academic_female.wav
+        reference_text: Trong machine learning, gradient descent là một thuật toán tối ưu hóa được sử dụng để tìm cực tiểu của một hàm mất mát.
+
+# Cắt khoảng lặng khi audio TTS dài hơn slot gốc — dùng chung cho cả 2 engine
+# (backend/services/dubbing/audio_fit.py::fit_by_silence, gọi từ fit_to_slot).
+audio_fit:
+  # Sàn giữ lại cho khoảng lặng KHÔNG được bảo vệ (giây).
+  silence_min_pause: 0.04
+  # Ngưỡng RMS (dB dưới đỉnh) để coi là khoảng lặng.
+  silence_db: -35.0
+  # Top N% khoảng lặng DÀI NHẤT được bảo vệ nhiều hơn (khả năng cao là chỗ
+  # ngắt câu/dấu phẩy — giữ nhịp thở tự nhiên).
+  protect_ratio: 0.3
+  # Sàn giữ lại cho nhóm được bảo vệ = silence_min_pause * hệ số này.
+  protect_min_pause_multiplier: 3.0
+  # Ngưỡng neo điểm bắt đầu/kết thúc tiếng nói thực (active_range_samples) —
+  # khác mục đích với silence_db ở trên (đó để CẮT, đây để NEO timing hiển thị).
+  active_range_silence_db: -45.0
+  active_range_head_ms: 40
+  active_range_tail_ms: 180
+
+# Trộn audio dub + nền gốc/background khi mux video cuối cùng
+# (backend/services/dubbing/common.py::merge_video_audio).
+mix:
+  # Âm lượng track gốc khi KHÔNG tách nền bằng Demucs (giữ nguyên cả giọng gốc, rất nhỏ).
+  original_volume: 0.05
+  # Âm lượng track dub khi KHÔNG tách nền.
+  dub_volume_no_background: 1.6
+  # Âm lượng track nền đã tách bằng Demucs (sạch giọng, để nguyên volume gốc).
+  background_volume: 1.0
+  # Âm lượng track dub khi CÓ tách nền bằng Demucs.
+  dub_volume_with_background: 1.35
+  # loudnorm (EBU R128) áp lên track đã mix, thay cho peak-clip chỉ hạ không nâng.
+  loudnorm_i: -16      # target loudness (LUFS)
+  loudnorm_tp: -1.5    # true peak tối đa (dBTP)
+  loudnorm_lra: 11     # loudness range cho phép

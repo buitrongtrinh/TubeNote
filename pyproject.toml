@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tubenote"
+version = "0.1.0"
+description = "TuBeNote — tóm tắt, dịch & lồng tiếng video YouTube"
+requires-python = ">=3.11"
+# Dependencies quản lý qua requirements.txt (pip install -r). pyproject này chỉ
+# để cài lõi editable (pip install -e .) → import backend ở mọi nơi, bỏ sys.path hack.
+
+[tool.setuptools.packages.find]
+include = ["backend*"]

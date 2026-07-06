@@ -15,13 +15,25 @@ cookies/*.txt
 # ==============================================================================
 # Runtime output — code tự tạo (os.makedirs)
 # ==============================================================================
+# Lưu ý: gitignore KHÔNG hỗ trợ comment inline — comment phải nằm dòng riêng.
+data/
+# Tên cũ (output/, chroma_langchain_db/): giữ phòng máy khác còn artefact.
 output/
-chroma_langchain_db/             # legacy vector store từ notebook era
+chroma_langchain_db/
 
 # ==============================================================================
-# Vietsub / TTS experiments — chưa ready để push
+# Scratch / experiments — chưa ready để push
 # ==============================================================================
+scratch/
 TTS_model_demo/
+*.ipynb
+*.log
+
+# ==============================================================================
+# Frontend (Next.js)
+# ==============================================================================
+frontend/node_modules/
+frontend/.next/
 translate_sub_demo/
 
 # Dev test files / one-off scripts
@@ -35,6 +47,11 @@ tmp/
 *.m4a
 *.mp4
 *.mkv
+# Ngoại lệ: voice preset gốc của 2 TTS engine — asset bắt buộc để dropdown
+# giọng hoạt động trên máy người clone repo (config.yaml tham chiếu tới).
+# Voice trích từ video người dùng lúc runtime nằm ở data/voice_clones/ (đã
+# ignore qua data/), KHÔNG nằm ở đây.
+!voice_clones/**/*.wav
 
 # ==============================================================================
 # Python
@@ -61,3 +78,5 @@ Thumbs.db
 # Claude / AI tooling
 # ==============================================================================
 .claude/
+.agents/
+.codex/

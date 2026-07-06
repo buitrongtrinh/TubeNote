@@ -1,8 +1,0 @@
-[server]
-# Tắt file watcher để Streamlit không scan modules trong venv.
-# Tránh spam warnings từ transformers/torch khi watcher đọc __path__ của
-# image_processing_*.py. Đổi thành "auto" nếu muốn auto-reload khi sửa code.
-fileWatcherType = "none"
-
-[browser]
-gatherUsageStats = false
