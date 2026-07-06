@@ -5,7 +5,7 @@ goal is to answer in Vietnamese with clickable source ranges from the video.
 
 ## Pipeline Diagram
 
-![TubeNote RAG pipeline](assets/tubenote-rag-pipeline.png)
+![TubeNote RAG pipeline](assets/tubenote-rag-pipeline.webp)
 
 ## User Flow
 

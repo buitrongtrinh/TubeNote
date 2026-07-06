@@ -9,7 +9,7 @@ subtitle acquisition, ASR fallback, duration-aware translation, TTS generation,
 speech/subtitle alignment, background audio preservation, and hybrid retrieval
 over processed transcripts.
 
-![TubeNote detailed architecture](docs/assets/tubenote-architecture.png)
+![TubeNote detailed architecture](docs/assets/tubenote-architecture.webp)
 
 ## Demo
 

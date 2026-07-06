@@ -8,7 +8,7 @@ and retrieval.
 
 ## Detailed Diagram
 
-![TubeNote detailed architecture](assets/tubenote-detailed-architecture.png)
+![TubeNote detailed architecture](assets/tubenote-detailed-architecture.webp)
 
 ## High-Level Flow
 

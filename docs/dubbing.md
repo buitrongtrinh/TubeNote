@@ -16,11 +16,11 @@ black-box dubbing:
 
 ## Pipeline Diagram
 
-![TubeNote dubbing pipeline](assets/tubenote-dubbing-pipeline.png)
+![TubeNote dubbing pipeline](assets/tubenote-dubbing-pipeline.webp)
 
 For a code-level view that maps each stage to the actual files and functions:
 
-![TTS engine flow mapped to source files](assets/tts-engine-flow.png)
+![TTS engine flow mapped to source files](assets/tts-engine-flow.webp)
 
 ## Stage 1: Load Video
 
