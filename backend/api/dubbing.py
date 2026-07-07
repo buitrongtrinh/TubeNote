@@ -11,9 +11,22 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from backend.pipeline import dubbing
+from backend.services.hardware import detect_cpu_cores, hardware_report, recommend_setup
 from backend.workers import jobs
 
 router = APIRouter(prefix="/api", tags=["dubbing"])
+
+
+@router.get("/hardware")
+def hardware():
+    """RAM/VRAM/cores máy chủ + bộ tham số đề xuất cho màn hình tạo lồng tiếng."""
+    return hardware_report()
+
+
+@router.get("/hardware/recommend")
+def hardware_recommend(ram_gb: float = 0, vram_gb: float = 0):
+    """Bộ tham số đề xuất cho RAM/VRAM người dùng nhập tay (cores vẫn lấy từ máy)."""
+    return recommend_setup(ram_gb, vram_gb, detect_cpu_cores())
 
 
 class LoadReq(BaseModel):

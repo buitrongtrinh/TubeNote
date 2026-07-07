@@ -1,6 +1,6 @@
 # TubeNote
 
-[![YouTube Demo](https://img.shields.io/badge/YouTube-Demo-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID)
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Demo-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=Y1PnEIHituE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
@@ -28,17 +28,29 @@ Click a thumbnail to watch on YouTube:
 
 | GUI walkthrough | Dubbed output sample |
 | :---: | :---: |
-| [![GUI walkthrough](https://img.youtube.com/vi/YOUR_GUI_DEMO_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) | [![Dubbed output sample](https://img.youtube.com/vi/YOUR_DUBBED_OUTPUT_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_DUBBED_OUTPUT_VIDEO_ID) |
+| [![GUI walkthrough](https://img.youtube.com/vi/YOUR_GUI_DEMO_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) | [![Dubbed output sample](https://img.youtube.com/vi/Y1PnEIHituE/hqdefault.jpg)](https://www.youtube.com/watch?v=Y1PnEIHituE) |
 
-<!-- Replace YOUR_GUI_DEMO_VIDEO_ID / YOUR_DUBBED_OUTPUT_VIDEO_ID (3 places:
-     the badge on top and the two thumbnails) with real YouTube video ids
-     before publishing. -->
+<!-- Still need a GUI walkthrough video: replace YOUR_GUI_DEMO_VIDEO_ID above
+     (2 places, same id) before publishing. -->
+
+**Library, in both light and dark theme:**
+
+![TubeNote library, light and dark theme](docs/assets/screenshot-library.webp)
+
+**Create Dubbing wizard: hardware auto-detection, TTS engine/voice/quality, translation prompts:**
+
+![TubeNote create dubbing wizard](docs/assets/screenshot-create.webp)
+
+**Video page: dubbed player, bilingual transcript, per-segment regeneration:**
+
+![TubeNote video page with player and transcript](docs/assets/screenshot-watch.webp)
 
 ## What TubeNote Does
 
 1. Loads a YouTube video and metadata with `yt-dlp`.
 2. Gets English subtitles from YouTube when available.
-3. Falls back to faster-whisper ASR when subtitles are unavailable.
+3. Falls back to faster-whisper ASR when subtitles are unavailable, re-splitting
+   word-level timestamps into natural sentences (pauses, punctuation, word cap).
 4. Generates duration-aware translation prompts from subtitle segments.
 5. Lets the user translate manually, or translate batches through an LLM API.
 6. Validates translated batches before TTS.
@@ -52,8 +64,15 @@ Click a thumbnail to watch on YouTube:
 
 - Local-first workflow: generated media, subtitles, Chroma indexes, summaries,
   logs, cookies, and voice samples stay outside git under ignored runtime paths.
-- Two ASR presets: CPU-friendly `small.en` and GPU `medium.en`, both through
-  faster-whisper/CTranslate2.
+- Hardware-aware setup: enter your machine's RAM/VRAM (auto-detected values
+  pre-filled) and TubeNote picks the whole parameter set — Whisper model size,
+  TTS engine, OmniVoice batch size, CPU thread counts — from calibratable tier
+  tables in `config.yaml`; batch still halves itself on CUDA OOM instead of
+  failing the job, and `scripts/measure_vram.py` measures real usage to tune
+  the tables.
+- Six ASR presets (tiny.en → medium.en, CPU int8 and CUDA fp16) through
+  faster-whisper/CTranslate2, with word-timestamp-based sentence re-splitting
+  for TTS-friendly segment boundaries.
 - Two translation modes:
   - Manual: copy prompts to ChatGPT and paste validated results back.
   - API: choose provider/model and translate batches directly from TubeNote.
@@ -96,7 +115,9 @@ backend/
     rag/               Chunking, embedding, Chroma store, summary cache
     video/             WebVTT and timing helpers
     youtube/           yt-dlp metadata/subtitle fetch and Whisper fallback
+    hardware.py        RAM/VRAM detection and hardware profile recommendation
   workers/             Lightweight background job registry
+  tests/               Unit tests (unittest, no GPU/model downloads needed)
 
 frontend/
   app/                 Next.js app routes: library, drafts, add, video detail
@@ -107,6 +128,9 @@ docs/
   architecture.md      System boundaries and data flow
   dubbing.md           Dubbing pipeline details
   rag.md               RAG indexing and Q&A details
+
+scripts/
+  measure_vram.py      Measure real VRAM/RAM usage to calibrate hardware tiers
 ```
 
 ## Documentation
@@ -135,19 +159,34 @@ notes and pipeline behavior are documented in the files above.
 
 ### Backend
 
+Pick the variant that matches your machine.
+
+**CPU-only machines** — install the CPU build of PyTorch first (several GB
+smaller, skips every CUDA download), then the CPU-safe requirements:
+
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
+python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r requirements.txt
 ```
 
-If your machine needs a specific PyTorch CUDA/MPS/XPU build, install the matching
-`torch` and `torchaudio` wheels first, then install `requirements.txt`.
+**Machines with an NVIDIA GPU** — add `requirements-gpu.txt`, which holds the
+CUDA 12 runtime wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`) that
+faster-whisper GPU mode needs:
 
-For faster-whisper GPU mode on Linux, `requirements.txt` includes CUDA 12
-`nvidia-cublas-cu12` and `nvidia-cudnn-cu12` wheels. `run.sh` adds installed
-NVIDIA wheel library directories to `LD_LIBRARY_PATH`.
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt -r requirements-gpu.txt
+```
+
+`run.sh` adds the installed NVIDIA wheel library directories to
+`LD_LIBRARY_PATH` automatically. If your PyTorch/OmniVoice setup needs a
+specific CUDA/MPS/XPU build, install the matching `torch`/`torchaudio` wheels
+first, then the requirements files.
 
 ### Frontend
 
@@ -162,6 +201,16 @@ cd ..
 ```bash
 cp .env.example .env
 ```
+
+**API keys are optional and depend on which features you use:**
+
+- Dubbing with **Manual translation mode** (copy prompts to ChatGPT, paste
+  results back): no API key needed at all.
+- **API translation mode**: needs one LLM provider key (DeepSeek/OpenAI/
+  Gemini/Anthropic).
+- **RAG Q&A chat**: retrieval and embeddings run locally for free, but answers
+  and the cached summary are generated by an LLM, so this also needs one
+  provider key.
 
 Fill only the providers/features you use. Current defaults:
 
@@ -329,7 +378,7 @@ yet. Wait a few seconds and refresh, or start backend manually before frontend.
 ### `libcublas.so.12` or cuDNN errors
 
 faster-whisper GPU mode needs CUDA runtime libraries. Install the CUDA 12
-NVIDIA wheels from `requirements.txt`, or switch ASR to CPU mode.
+NVIDIA wheels from `requirements-gpu.txt`, or switch ASR to CPU mode.
 
 ### Demucs downloads weights or fails on first run
 

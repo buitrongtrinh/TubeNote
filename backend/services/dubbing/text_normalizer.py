@@ -12,8 +12,8 @@ import unicodedata
 
 
 ALPHABET_PHONETIC = {
-    "A": "ei", "B": "bi", "C": "si", "D": "di", "E": "i",
-    "F": "ef", "G": "ji", "H": "eit", "I": "ai", "J": "jei",
+    "A": "ei", "B": "bi", "C": "si", "D": "đi", "E": "i",
+    "F": "ép", "G": "ji", "H": "ếch", "I": "ai", "J": "jei",
     "K": "kei", "L": "eo", "M": "em", "N": "en", "O": "ou",
     "P": "pi", "Q": "kiu", "R": "ar", "S": "es", "T": "ti",
     "U": "diu", "V": "vi", "W": "đúp liu", "X": "ek", "Y": "wai",

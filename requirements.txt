@@ -1,11 +1,11 @@
-# TubeNote backend/runtime dependencies.
+# TubeNote backend/runtime dependencies (CPU-safe).
 # Python 3.11 is recommended.
 #
-# GPU note:
-# - `faster-whisper` GPU mode needs CUDA runtime libraries. The CUDA 12 wheels
-#   below provide libcublas/cuDNN for CTranslate2 on most Linux setups.
-# - If your PyTorch/OmniVoice setup needs a specific CUDA/MPS/XPU build, install
-#   the matching torch/torchaudio wheels first, then run this requirements file.
+# GPU users: also install `requirements-gpu.txt` for the CUDA runtime wheels
+# that faster-whisper GPU mode needs. CPU-only machines skip that file, and can
+# additionally install the CPU build of torch first (see README > Setup).
+# If your PyTorch/OmniVoice setup needs a specific CUDA/MPS/XPU build, install
+# the matching torch/torchaudio wheels first, then run this requirements file.
 
 # API server
 fastapi>=0.110
@@ -35,8 +35,6 @@ langchain-anthropic>=0.3
 yt-dlp>=2024.8
 faster-whisper>=1.0
 openai-whisper>=20240930
-nvidia-cublas-cu12
-nvidia-cudnn-cu12==9.*
 
 # Audio/video processing
 numpy>=1.26

@@ -1,0 +1,9 @@
+# CUDA runtime wheels for faster-whisper GPU mode (CTranslate2 needs
+# libcublas/cuDNN). Only for machines with an NVIDIA GPU:
+#
+#   python -m pip install -r requirements.txt -r requirements-gpu.txt
+#
+# run.sh automatically adds these wheels' library dirs to LD_LIBRARY_PATH.
+# CPU-only machines must NOT install this file (~1GB of useless downloads).
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*

@@ -80,6 +80,7 @@ function buildDubbingRows(meta, segments) {
     ["Model", tts.model],
     ["Giọng", tts.voice_label || tts.voice_id],
     ["Chất lượng", tts.num_step || fallbackSegment?.num_step ? `${tts.num_step || fallbackSegment?.num_step} steps` : null],
+    ["Batch TTS", tts.batch_size ? String(tts.batch_size) : null],
     ["ASR", compactJoin([asr.preset, asr.engine])],
     ["Dịch", translationLabel],
     ["Nhạc nền", typeof background.enabled === "boolean" ? (background.enabled ? `Bật${background.source ? ` · ${background.source}` : ""}` : "Tắt") : null],

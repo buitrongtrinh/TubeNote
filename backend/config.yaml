@@ -64,9 +64,6 @@ cookies:
   single_file: null
 
 
-agent:
-  max_iterations: 6
-
 rag:
   # Relevance threshold sau khi normalize cosine distance về [0, 1].
   # Mapping: 1.0 = identical, 0.5 = orthogonal (no relation), 0.0 = opposite.
@@ -102,11 +99,6 @@ web_search:
   # 1.0 = identical, 0.5 = orthogonal (no relation), 0.0 = opposite.
   auto_threshold: 0.55
 
-ui:
-  title: "TubeNote"
-  page_icon: "📓"
-  caption: "Chat với video YouTube — tóm tắt + Q&A có nhớ context. Multi-LLM (DeepSeek / Gemini / OpenAI / Anthropic)."
-
 paths:
   audio_dir: data/audio
   video_dir: data/video
@@ -130,7 +122,36 @@ whisper:
   sentence_pause_alpha: 0.02   # giây; gap giữa 2 từ >= ngưỡng này -> cắt câu mới
   sentence_max_words: 20        # giới hạn cứng số từ/câu khi không có pause/dấu phẩy để cắt; đặt 0 để tắt (không cắt cứng theo số từ)
   sentence_min_words: 2        # câu tách ra ít hơn ngần này từ (vd 1 từ đứng riêng) sẽ tự gộp vào câu liền kề gần hơn về thời gian
+  # cpu_threads: 0 = auto theo số core máy (clamp hardware.max_auto_threads).
   presets:
+    cpu_tiny:
+      label: Whisper - CPU (tiny)
+      description: Máy RAM thấp (<4GB); tiny.en + CPU int8, nhanh nhất, kém chính xác nhất.
+      engine: faster
+      model: tiny.en
+      language: en
+      device: cpu
+      compute_type: int8
+      batch_size: 4
+      beam_size: 5
+      cpu_threads: 0
+      num_workers: 2
+      progressive: true
+      word_timestamps: true
+    cpu_base:
+      label: Whisper - CPU (base)
+      description: Máy RAM 4-6GB; base.en + CPU int8, cân bằng cho máy yếu.
+      engine: faster
+      model: base.en
+      language: en
+      device: cpu
+      compute_type: int8
+      batch_size: 4
+      beam_size: 5
+      cpu_threads: 0
+      num_workers: 2
+      progressive: true
+      word_timestamps: true
     cpu:
       label: Whisper - CPU
       description: Tương thích máy không có GPU; small.en + CPU int8.
@@ -141,8 +162,34 @@ whisper:
       compute_type: int8
       batch_size: 4
       beam_size: 5
-      cpu_threads: 8
+      cpu_threads: 0
       num_workers: 2
+      progressive: true
+      word_timestamps: true
+    cpu_medium:
+      label: Whisper - CPU (medium, chậm)
+      description: medium.en + CPU int8 — chính xác hơn nhưng chậm hơn nhiều lần; chỉ dành cho ai chấp nhận chờ.
+      engine: faster
+      model: medium.en
+      language: en
+      device: cpu
+      compute_type: int8
+      batch_size: 4
+      beam_size: 5
+      cpu_threads: 0
+      num_workers: 2
+      progressive: true
+      word_timestamps: true
+    gpu_small:
+      label: Whisper - GPU (small)
+      description: GPU VRAM nhỏ (~2GB); small.en + CUDA float16.
+      engine: faster
+      model: small.en
+      language: en
+      device: cuda
+      compute_type: float16
+      batch_size: 4
+      beam_size: 5
       progressive: true
       word_timestamps: true
     gpu:
@@ -153,7 +200,7 @@ whisper:
       language: en
       device: cuda
       compute_type: float16
-      batch_size: 4
+      batch_size: 8
       beam_size: 5
       progressive: true
       word_timestamps: true
@@ -179,12 +226,6 @@ translation:
   api_concurrency: 8
   api_job_timeout_sec: 300
 
-subtitle:
-  # CSS ``::cue { font-size: X% }`` cho subtitle preview/player.
-  font_size_pct: 60
-  # CSS ``::cue { background: rgba(0,0,0, X) }`` opacity nền sau text (0.0 - 1.0)
-  bg_alpha: 0.7
-
 tts:
   # Supertonic voice/model name. Có thể override default bằng env TTS_MODEL.
   # Thêm voice hợp lệ vào đây để frontend hiện trong dropdown.
@@ -209,6 +250,9 @@ tts:
     merge_max_chars: 20
     # Tốc độ phát lại cuối cùng của video xuất ra (retime, không phải TTS speed).
     output_speed: 1.0
+    # Số thread ONNX Runtime cho Supertonic (intra_op). 0 = auto (ORT tự chọn
+    # theo core máy). Model cache global -> đổi giá trị cần restart backend.
+    intra_op_threads: 0
 
   omnivoice:
     # Model checkpoint/Hugging Face repo id. Override bằng env OMNIVOICE_MODEL.
@@ -221,7 +265,9 @@ tts:
     num_step: 32
     wsola_limit: 1.05
     # Số câu gộp vào 1 lần gọi generate() (throughput GPU).
-    batch_size: 4
+    # 0 = auto: chọn theo VRAM máy qua bảng hardware.omnivoice_batch_by_vram;
+    # gặp CUDA OOM lúc chạy sẽ tự giảm nửa batch rồi thử lại (không chết job).
+    batch_size: 0
     # Tắt để dùng thẳng audio thô (debug); mặc định luôn fit về đúng slot.
     fit_audio: true
     # Hệ số an toàn khi tính phần "dư" cộng vào generation_duration
@@ -289,3 +335,44 @@ mix:
   loudnorm_i: -16      # target loudness (LUFS)
   loudnorm_tp: -1.5    # true peak tối đa (dBTP)
   loudnorm_lra: 11     # loudness range cho phép
+
+# Phát hiện phần cứng + đề xuất cấu hình ở màn hình "Tạo lồng tiếng"
+# (GET /api/hardware, backend/services/hardware.py). Backend tự đọc RAM
+# (/proc/meminfo) và VRAM (torch.cuda) — người dùng không cần biết thông số.
+hardware:
+  # Người dùng nhập RAM/VRAM ở màn hình "Tạo lồng tiếng" (auto-detect chỉ để
+  # pre-fill) -> backend/services/hardware.py::recommend_setup tra các bảng
+  # dưới đây để sinh bộ tham số mặc định (ASR model, TTS engine, batch,
+  # threads). Muốn calibrate lại: chạy scripts/measure_vram.py trên máy thật
+  # rồi sửa ngưỡng ở đây — không cần sửa code.
+  #
+  # Quy tắc tra bảng chung: lấy dòng có ngưỡng LỚN NHẤT mà giá trị máy >= ngưỡng.
+
+  # ASR theo VRAM (GB). Không đạt dòng nào (hoặc không GPU) -> rơi về bảng CPU.
+  asr_gpu_by_vram:
+    2: gpu_small        # small.en fp16 (~1.5GB VRAM)
+    3.5: gpu            # medium.en fp16 (~3GB VRAM)
+  # ASR CPU theo RAM (GB). Ràng buộc thật của CPU là TỐC ĐỘ chứ không phải
+  # RAM, nên auto đề xuất tối đa small.en; medium.en CPU (rất chậm) chỉ nằm
+  # trong danh sách Nâng cao, không bao giờ được auto đề xuất.
+  asr_cpu_by_ram:
+    0: cpu_tiny         # < 4GB
+    4: cpu_base         # 4-6GB
+    6: cpu              # >= 6GB: small.en int8
+
+  # VRAM (GB) tối thiểu để đề xuất OmniVoice. 3.5-5GB dùng batch 1 để vẫn thử
+  # được OmniVoice trên GPU nhỏ; nếu load model OOM thì người dùng vẫn cần hạ
+  # về Supertonic CPU.
+  # Hiệu chỉnh theo máy thật: RTX 4050 Laptop 5.6GB chạy OmniVoice batch 4 ổn.
+  omnivoice_min_vram_gb: 3.5
+  # Bảng chọn batch_size OmniVoice theo VRAM khi tts.omnivoice.batch_size = 0.
+  # Ngưỡng chỉ là ước lượng — VRAM thực tế còn tùy độ dài segment; đã có cơ
+  # chế tự giảm nửa batch khi CUDA OOM nên đặt hơi lạc quan cũng an toàn.
+  omnivoice_batch_by_vram:
+    3.5: 1
+    5: 4
+    12: 6
+    16: 8
+  # Trần số thread khi auto theo số core (whisper cpu_threads=0 và
+  # supertonic intra_op_threads=0).
+  max_auto_threads: 16

@@ -162,7 +162,6 @@ summary:focus-visible {
 
 .nav-actions { gap: 6px; }
 .nav-actions a,
-.create-button,
 .action-row button,
 .chip,
 button {
@@ -188,14 +187,12 @@ button:active:not(:disabled) { transform: scale(0.98); }
 button:hover:not(:disabled) { background: var(--surface-3); }
 
 .nav-actions a.active,
-.primary,
-.create-button {
+.primary {
   background: var(--solid-bg);
   color: var(--solid-text);
 }
 
 .primary:hover:not(:disabled),
-.create-button:hover,
 .nav-actions a.active:hover {
   background: var(--solid-hover);
 }
@@ -204,14 +201,6 @@ button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-
-.create-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.create-button span { font-size: 1.1rem; line-height: 1; }
 
 .theme-toggle {
   flex: 0 0 auto;
@@ -267,50 +256,10 @@ h1 {
 
 .feed-header p { margin-top: 4px; }
 
-.topic-row {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding: 6px 0 22px;
-  scrollbar-width: none;
-}
-
-.topic-row::-webkit-scrollbar { display: none; }
-
-.topic {
-  padding: 8px 13px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.topic.active {
-  background: var(--solid-bg);
-  color: var(--solid-text);
-}
-
 .video-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 30px 20px;
-}
-
-.library-section {
-  margin-bottom: 30px;
-}
-
-.library-section .section-head {
-  margin-bottom: 12px;
-}
-
-.draft-grid {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 360px));
-}
-
-.draft-card .thumb-wrap {
-  background: #111;
 }
 
 .draft-thumb-placeholder {
@@ -502,8 +451,7 @@ h1 {
 .meta-box,
 .prompt-card,
 .publish-bar,
-.create-steps,
-.description-box {
+.create-steps {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -522,6 +470,7 @@ h1 {
 .url-row { gap: 10px; }
 
 input[type="text"],
+input[type="number"],
 select,
 textarea {
   width: 100%;
@@ -536,6 +485,7 @@ textarea {
 }
 
 input[type="text"]:focus,
+input[type="number"]:focus,
 select:focus,
 textarea:focus {
   border-color: var(--focus);
@@ -842,6 +792,48 @@ textarea {
   padding-bottom: 11px;
 }
 
+.load-options.hw-options {
+  grid-template-columns: minmax(90px, 120px) minmax(110px, 140px) minmax(220px, 1fr) auto;
+}
+
+.load-options.tts-engine-options {
+  grid-template-columns: minmax(220px, 320px) minmax(110px, 140px) minmax(220px, 1fr);
+}
+
+.hw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.hw-actions button {
+  min-height: 38px;
+  padding-inline: 12px;
+}
+
+.hw-recommend {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.hw-recommend b { color: var(--text); font-weight: 700; }
+
+.hw-recommend.pending {
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface-2));
+}
+
+.hw-recommend span {
+  color: var(--warn);
+  font-weight: 700;
+}
+
 .load-progress-box {
   display: grid;
   gap: 8px;
@@ -1114,16 +1106,6 @@ textarea {
 
 .watch-main { min-width: 0; }
 
-.back-link {
-  display: inline-flex;
-  margin-bottom: 10px;
-  color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.back-link:hover { color: var(--text); }
-
 .watch-title {
   margin-top: 14px;
   font-size: 1.3rem;
@@ -1138,25 +1120,6 @@ textarea {
 .channel-block { gap: 12px; min-width: 0; }
 .channel-name { font-weight: 800; }
 .action-row { gap: 8px; flex-wrap: wrap; }
-
-.description-box {
-  margin-top: 14px;
-  padding: 13px 14px;
-}
-
-.description-box summary {
-  cursor: pointer;
-  color: var(--text);
-  font-weight: 800;
-}
-
-.description-box pre {
-  margin-top: 10px;
-  white-space: pre-wrap;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 0.9rem;
-}
 
 .dubbing-info-box {
   margin-top: 14px;
@@ -2048,7 +2011,9 @@ media-player .vds-time-slider .vds-slider-chapter {
   .prompt-end { grid-column: 2; justify-content: flex-start; }
   .tts-panel-head { flex-direction: column; gap: 6px; }
   .tts-panel-head em { text-align: left; }
-  .load-options { grid-template-columns: 1fr; }
+  .load-options,
+  .load-options.hw-options,
+  .load-options.tts-engine-options { grid-template-columns: 1fr; }
   .load-options em { padding-bottom: 0; }
   .tts-grid,
   .tts-advanced,

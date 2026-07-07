@@ -24,6 +24,9 @@ async function jdelete(path) {
 }
 
 export const api = {
+  hardware: () => jget("/api/hardware"),
+  hardwareRecommend: (ramGb = 0, vramGb = 0) =>
+    jget(`/api/hardware/recommend?ram_gb=${encodeURIComponent(ramGb)}&vram_gb=${encodeURIComponent(vramGb)}`),
   library: () => jget("/api/library"),
   drafts: () => jget("/api/drafts"),
   deleteVideo: (vid) => jdelete(`/api/video/${encodeURIComponent(vid)}`),

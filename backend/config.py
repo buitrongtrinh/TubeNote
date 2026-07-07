@@ -71,19 +71,12 @@ class WhisperCfg:
 @dataclass
 class TranslationCfg:
     model: str              # LLM dịch transcript → VN
-    batch_size: int         # segments / LLM call
     manual_batch_size: int
     api_batch_size: int
     api_min_batch_size: int
     api_max_chars_per_batch: int
     api_concurrency: int
     api_job_timeout_sec: int
-
-
-@dataclass
-class SubtitleCfg:
-    font_size_pct: int      # CSS ``::cue { font-size: X% }``
-    bg_alpha: float         # CSS ``::cue { background: rgba(0,0,0, alpha) }``
 
 
 @dataclass
@@ -104,6 +97,8 @@ class SupertonicEngineCfg:
     speed_alpha: float
     merge_max_chars: int
     output_speed: float
+    # Thread ONNX Runtime (intra_op); 0 = auto để ORT tự chọn theo core.
+    intra_op_threads: int
 
 
 @dataclass
@@ -148,6 +143,16 @@ class MixCfg:
 
 
 @dataclass
+class HardwareCfg:
+    """Bảng tier phần cứng: (RAM, VRAM) -> ASR preset / TTS engine / batch / threads."""
+    omnivoice_min_vram_gb: float
+    omnivoice_batch_by_vram: Dict[float, int]
+    asr_gpu_by_vram: Dict[float, str]
+    asr_cpu_by_ram: Dict[float, str]
+    max_auto_threads: int
+
+
+@dataclass
 class TtsCfg:
     default_model: str
     models: List[str]
@@ -168,11 +173,6 @@ class TranscriptCfg:
 class CookiesCfg:
     dir: Optional[Path]
     single_file: Optional[Path]
-
-
-@dataclass
-class AgentCfg:
-    max_iterations: int
 
 
 @dataclass
@@ -201,29 +201,20 @@ class WebSearchCfg:
 
 
 @dataclass
-class UICfg:
-    title: str
-    page_icon: str
-    caption: str
-
-
-@dataclass
 class AppCfg:
     llm: LLMCfg
     transcript: TranscriptCfg
     cookies: CookiesCfg
-    agent: AgentCfg
-    ui: UICfg
     paths: PathsCfg
     rag: RagCfg
     embedding: EmbeddingCfg
     web_search: WebSearchCfg
     whisper: WhisperCfg
     translation: TranslationCfg
-    subtitle: SubtitleCfg
     tts: TtsCfg
     audio_fit: AudioFitCfg
     mix: MixCfg
+    hardware: HardwareCfg
 
 def _abs(path: Optional[str]) -> Optional[Path]:
     if not path:
@@ -255,15 +246,6 @@ def load() -> AppCfg:
         single_file=_abs(os.getenv("YT_COOKIES_PATH") or ck.get("single_file")),
     )
 
-    ag = raw.get("agent", {})
-    agent = AgentCfg(max_iterations=int(ag.get("max_iterations", 6)))
-
-    ui_raw = raw.get("ui", {})
-    ui = UICfg(
-        title=ui_raw.get("title", "YouTube Summarizer"),
-        page_icon=ui_raw.get("page_icon", "🎬"),
-        caption=ui_raw.get("caption", ""),
-    )
     paths_raw = raw.get("paths", {})
     paths = PathsCfg(
         audio_dir=_abs(paths_raw.get("audio_dir") or "data/audio"),
@@ -290,22 +272,14 @@ def load() -> AppCfg:
     )
 
     tr_raw = raw.get("translation", {})
-    translation_batch_size = int(tr_raw.get("batch_size", 150))
     translation = TranslationCfg(
         model=str(tr_raw.get("model", "gemini-2.5-flash-lite")),
-        batch_size=translation_batch_size,
-        manual_batch_size=int(tr_raw.get("manual_batch_size", translation_batch_size)),
+        manual_batch_size=int(tr_raw.get("manual_batch_size", 50)),
         api_batch_size=int(tr_raw.get("api_batch_size", 25)),
         api_min_batch_size=int(tr_raw.get("api_min_batch_size", 5)),
         api_max_chars_per_batch=int(tr_raw.get("api_max_chars_per_batch", 4000)),
         api_concurrency=int(tr_raw.get("api_concurrency", 8)),
         api_job_timeout_sec=int(tr_raw.get("api_job_timeout_sec", 300)),
-    )
-
-    subtitle_raw = raw.get("subtitle", {})
-    subtitle = SubtitleCfg(
-        font_size_pct=int(subtitle_raw.get("font_size_pct", 60)),
-        bg_alpha=float(subtitle_raw.get("bg_alpha", 0.7)),
     )
 
     tts_raw = raw.get("tts", {})
@@ -343,6 +317,7 @@ def load() -> AppCfg:
         speed_alpha=float(supertonic_raw.get("speed_alpha", 1.2)),
         merge_max_chars=int(supertonic_raw.get("merge_max_chars", 0)),
         output_speed=float(supertonic_raw.get("output_speed", 1.0)),
+        intra_op_threads=int(supertonic_raw.get("intra_op_threads", 0)),
     )
     omni_engine = OmniVoiceEngineCfg(
         num_step=int(omni_raw.get("num_step", 32)),
@@ -388,6 +363,34 @@ def load() -> AppCfg:
         loudnorm_lra=float(mix_raw.get("loudnorm_lra", 11)),
     )
 
+    hw_raw = raw.get("hardware", {}) or {}
+
+    def _tier_table(key: str, cast, default: dict) -> dict:
+        """Bảng {ngưỡng: giá trị} từ yaml; khóa ép float, giá trị ép ``cast``."""
+        table_raw = hw_raw.get(key)
+        table: dict = {}
+        if isinstance(table_raw, dict):
+            for k, v in table_raw.items():
+                try:
+                    table[float(k)] = cast(v)
+                except (TypeError, ValueError):
+                    continue
+        return table or default
+
+    hardware = HardwareCfg(
+        omnivoice_min_vram_gb=float(hw_raw.get("omnivoice_min_vram_gb", 5)),
+        omnivoice_batch_by_vram=_tier_table(
+            "omnivoice_batch_by_vram", int, {5.0: 4, 12.0: 6, 16.0: 8},
+        ),
+        asr_gpu_by_vram=_tier_table(
+            "asr_gpu_by_vram", str, {2.0: "gpu_small", 3.5: "gpu"},
+        ),
+        asr_cpu_by_ram=_tier_table(
+            "asr_cpu_by_ram", str, {0.0: "cpu_tiny", 4.0: "cpu_base", 6.0: "cpu"},
+        ),
+        max_auto_threads=int(hw_raw.get("max_auto_threads", 16)),
+    )
+
     rag_raw = raw.get("rag", {})
     rag = RagCfg(
         similarity_threshold=float(rag_raw.get("similarity_threshold", 0.55)),
@@ -414,10 +417,10 @@ def load() -> AppCfg:
     )
 
     return AppCfg(
-        llm=llm, transcript=transcript, cookies=cookies, agent=agent,
-        ui=ui, paths=paths, rag=rag, embedding=embedding, web_search=web_search,
-        whisper=whisper, translation=translation, subtitle=subtitle, tts=tts,
-        audio_fit=audio_fit, mix=mix,
+        llm=llm, transcript=transcript, cookies=cookies,
+        paths=paths, rag=rag, embedding=embedding, web_search=web_search,
+        whisper=whisper, translation=translation, tts=tts,
+        audio_fit=audio_fit, mix=mix, hardware=hardware,
     )
 
 

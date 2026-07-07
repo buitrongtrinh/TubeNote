@@ -122,8 +122,11 @@ def _duration_min(metadata: dict) -> float | None:
 
 def _run_mode(whisper_preset: str | None = None, tts_engine: str | None = None) -> str:
     preset = (whisper_preset or CFG.whisper.default_preset or "").lower()
-    if preset in {"cpu", "gpu"}:
-        return preset
+    # Prefix-match để nhận cả các preset mở rộng (cpu_tiny, gpu_small, ...).
+    if preset.startswith("cpu"):
+        return "cpu"
+    if preset.startswith("gpu"):
+        return "gpu"
     engine = (tts_engine or "").lower()
     if engine == "omnivoice":
         return "gpu"
@@ -173,6 +176,16 @@ def _clean_meta_value(value):
     return value
 
 
+def _tts_batch_size_for_log(tts_cfg: dict) -> int | None:
+    if (tts_cfg.get("engine") or "").lower() != "omnivoice":
+        return None
+    try:
+        batch_size = int(tts_cfg.get("batch_size") or 0)
+    except (TypeError, ValueError):
+        return None
+    return batch_size if batch_size > 0 else None
+
+
 def _latest_dubbing_metadata(
     *,
     tts_cfg: dict,
@@ -199,6 +212,7 @@ def _latest_dubbing_metadata(
             "voice_label": _voice_label(tts_cfg),
             "voice_mode": tts_cfg.get("voice_mode"),
             "num_step": tts_cfg.get("num_step"),
+            "batch_size": _clean_meta_value(run.get("tts_batch_size")) or _tts_batch_size_for_log(tts_cfg),
             "speed_alpha": tts_cfg.get("speed_alpha"),
             "output_speed": tts_cfg.get("output_speed"),
         },
@@ -746,6 +760,9 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         "language": cfg.get("language") or "vi",
         **TTS_POLICIES["omnivoice"],
         "num_step": num_step,
+        # UI có thể gửi batch tính từ VRAM người dùng NHẬP TAY (khác VRAM
+        # detect) — ưu tiên nó; 0/thiếu = auto theo VRAM detect lúc synth.
+        "batch_size": int(cfg.get("batch_size") or 0) or TTS_POLICIES["omnivoice"]["batch_size"],
         "keep_background": keep_background,
     }
 
@@ -756,7 +773,11 @@ def init_tts(model: str | None = None):
         raise ValueError(f"TTS model không hợp lệ: {voice_name!r}")
     if "tts" not in _TTS_CACHE:
         from supertonic import TTS
-        _TTS_CACHE["tts"] = TTS()
+        # intra_op_threads=0 -> None: để ONNX Runtime tự chọn theo core máy.
+        # Model cache global nên đổi giá trị trong config cần restart backend.
+        _TTS_CACHE["tts"] = TTS(
+            intra_op_num_threads=CFG.tts.supertonic.intra_op_threads or None,
+        )
         _TTS_CACHE["styles"] = {}
 
     styles = _TTS_CACHE.setdefault("styles", {})
@@ -1423,6 +1444,7 @@ def _run_dubbing_impl(
         run_log.update_run(
             run_id,
             tts_engine=tts_cfg["engine"],
+            tts_batch_size=_tts_batch_size_for_log(tts_cfg),
             status="error",
             error=str(exc),
             total_time_sec=loaded_total + (time.perf_counter() - dub_started),
@@ -1457,6 +1479,7 @@ def _run_dubbing_impl(
         run_log.update_run(
             run_id,
             tts_engine=tts_cfg["engine"],
+            tts_batch_size=_tts_batch_size_for_log(tts_cfg),
             tts_time_sec=tts_time,
             status="error",
             error=str(exc),
@@ -1466,6 +1489,7 @@ def _run_dubbing_impl(
     run_log.update_run(
         run_id,
         tts_engine=tts_cfg["engine"],
+        tts_batch_size=_tts_batch_size_for_log(tts_cfg),
         tts_time_sec=tts_time,
         total_time_sec=loaded_total + (time.perf_counter() - dub_started),
         status="dubbed",

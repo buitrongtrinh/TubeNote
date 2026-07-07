@@ -66,9 +66,68 @@ dubbing, the same file is enriched with Vietnamese text and TTS timing:
 }
 ```
 
-The current design intentionally keeps raw Whisper/YouTube segments as the source
-input for translation and TTS. Earlier experiments with automatic post-ASR
-merge/split were removed to keep the pipeline easier to inspect.
+YouTube subtitles are used as-is. Whisper output, however, is **re-split from
+word-level timestamps** (`word_timestamps=True` in faster-whisper) instead of
+trusting Whisper's own segment boundaries, which are not anchored to real
+pauses and often glue two spoken sentences together or leak silence into the
+edges. All words are flattened into one timeline, then rebuilt into sentences
+using three signals (`backend/services/youtube/transcript_whisper.py`):
+
+```text
+1. pause: gap between two words >= sentence_pause_alpha (default 0.02s)
+2. punctuation: previous word ends a sentence (. ! ? …)
+3. word cap: sentence_max_words hard limit, preferring cuts at commas or
+   conjunctions near the middle (0 disables the cap entirely)
+```
+
+Fragments shorter than `sentence_min_words` are merged into the closer
+neighbor, and segment start/end are tightened to the first/last real word.
+All three knobs live in `backend/config.yaml` under `whisper:`. If word
+timestamps are unavailable for a segment (alignment failure, or
+`word_timestamps: false` in the preset), that segment falls back to Whisper's
+raw boundaries — speech is never dropped.
+
+## Hardware-Aware Setup
+
+The create screen asks for the machine's **RAM and VRAM** (two number inputs)
+instead of exposing raw ASR/TTS knobs up front. Auto-detection only pre-fills
+the inputs — this is a local open-source tool, so users can correct or
+override the values, and the numbers they enter are persisted in
+`localStorage` (outliving drafts).
+
+```text
+GET /api/hardware                     detected RAM/VRAM/cores + recommendation
+GET /api/hardware/recommend?ram_gb=&vram_gb=   recommendation for manual values
+```
+
+`backend/services/hardware.py::recommend_setup` maps (RAM, VRAM, cores) to a
+full parameter set using tier tables in `backend/config.yaml` (section
+`hardware`) — recalibrate by editing the yaml, no code changes:
+
+```text
+asr_gpu_by_vram    VRAM >= 2GB -> gpu_small (small.en fp16)
+                   VRAM >= 3.5GB -> gpu (medium.en fp16)
+asr_cpu_by_ram     RAM < 4GB -> cpu_tiny, 4-6GB -> cpu_base, >= 6GB -> cpu
+                   (CPU is speed-bound, not RAM-bound, so the auto pick caps
+                   at small.en; cpu_medium exists but is advanced-only)
+omnivoice_min_vram_gb   VRAM >= 5GB -> OmniVoice, else Supertonic
+omnivoice_batch_by_vram batch 4 at 5GB, 6 at 12GB, 8 at 16GB
+max_auto_threads   whisper cpu_threads / supertonic intra_op threads = cores,
+                   clamped to this cap (0 in presets/config = auto)
+```
+
+Changing RAM/VRAM re-applies the recommendation (ASR preset, TTS engine, and
+an OmniVoice `batch_size` carried in the dub payload so a manually entered
+VRAM wins over the detected one). Manual tweaks in the advanced ASR select or
+the TTS panel stick until the hardware inputs change again. The CUDA
+OOM-halving fallback in `synthesize_omnivoice` remains the runtime safety net.
+
+To calibrate the tables with real measurements on your machine:
+
+```bash
+python scripts/measure_vram.py --omnivoice --batch 4 --num-step 32
+python scripts/measure_vram.py --whisper gpu --audio data/audio/<id>.mp3
+```
 
 ## ASR Presets
 
@@ -266,7 +325,7 @@ The difference is only the TTS engine behavior:
 | TTS input | `text_tts` from `data/subtitles/{video_id}.json` | `text_tts` from `data/subtitles/{video_id}.json` |
 | Duration request | Not supported by the model call | `duration = source duration + adaptive delta` |
 | Voice options | "Giọng nam", "Giọng nữ" | "Giọng nam", "Giọng nữ", or source-video voice clone |
-| Batch generation | One segment at a time | Batched generation, default batch size 4 |
+| Batch generation | One segment at a time | Batched generation; batch size auto-picked from VRAM (`hardware.omnivoice_batch_by_vram`), halved and retried on CUDA OOM |
 | Default quality | 8 steps | 32 steps |
 
 Both engines adapt to how much a translated segment actually overflows its

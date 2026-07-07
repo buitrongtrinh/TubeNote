@@ -211,11 +211,6 @@ def _generation_slot_seconds(
     return max(0.2, slot + delta)
 
 
-def _chunks(items: list[tuple[int, dict]], size: int):
-    for start in range(0, len(items), size):
-        yield items[start:start + size]
-
-
 def synthesize_omnivoice(
     data: list[dict],
     output_path: str,
@@ -225,6 +220,7 @@ def synthesize_omnivoice(
     """Generate a full dubbed WAV aligned to source segment starts."""
     import numpy as np
     import soundfile as sf
+    import torch
 
     if not data:
         return []
@@ -246,7 +242,14 @@ def synthesize_omnivoice(
     language = config.get("language") or "vi"
     num_step = int(config.get("num_step") or 32)
     postprocess_output = bool(config.get("postprocess_output", False))
-    batch_size = max(1, int(config.get("batch_size") or 1))
+    # batch_size <= 0 nghĩa là auto: tra bảng hardware.omnivoice_batch_by_vram
+    # theo VRAM máy (config.yaml). Sai số của bảng được cứu bởi cơ chế giảm
+    # nửa batch khi CUDA OOM ở vòng generate bên dưới.
+    batch_size = int(config.get("batch_size") or 0)
+    if batch_size <= 0:
+        from backend.services.hardware import auto_omnivoice_batch_size
+        batch_size = auto_omnivoice_batch_size()
+    batch_size = max(1, batch_size)
     raw_wsola_limit = config.get("wsola_limit")
     wsola_limit = float(1.00 if raw_wsola_limit is None else raw_wsola_limit)
     fit_audio = bool(config.get("fit_audio", True))
@@ -270,7 +273,9 @@ def synthesize_omnivoice(
 
     items = [(idx, item) for idx, item in enumerate(data) if (item.get("text_tts") or "").strip()]
     done = 0
-    for batch in _chunks(items, batch_size):
+    pos = 0
+    while pos < len(items):
+        batch = items[pos:pos + batch_size]
         texts = [(item.get("text_tts") or "").strip() for _, item in batch]
         target_durations = [_slot_seconds(data, idx) for idx, _ in batch]
         generation_durations = [
@@ -295,7 +300,26 @@ def synthesize_omnivoice(
         elif instruct:
             kwargs["instruct"] = [instruct] * len(batch)
 
-        audios = model.generate(**kwargs)
+        try:
+            # KHÔNG có inference_mode() thì PyTorch build/giữ lại autograd
+            # graph cho từng lần generate() — không lỗi ngay, nhưng VRAM tích
+            # lũy dần qua mỗi lần dub trong cùng process, tới lần thứ 5 thì
+            # tràn dù batch/độ dài y hệt 4 lần trước (đã thấy đúng pattern này
+            # trong data/logs/dubbing_runs.csv: dubbed x4 rồi OOM ở lần 5,
+            # "5.40 GiB allocated by PyTorch" dù model chỉ vài GB).
+            with torch.inference_mode():
+                audios = model.generate(**kwargs)
+        except RuntimeError as exc:
+            # CUDA OOM (torch.cuda.OutOfMemoryError là subclass của
+            # RuntimeError): giải phóng cache, giảm NỬA batch rồi thử lại đúng
+            # đoạn này — batch mới giữ luôn cho phần còn lại của video.
+            if "out of memory" not in str(exc).lower() or batch_size <= 1:
+                raise
+            torch.cuda.empty_cache()
+            batch_size = max(1, batch_size // 2)
+            print(f"[omnivoice] CUDA OOM — giảm batch_size xuống {batch_size} rồi thử lại…", flush=True)
+            continue
+        pos += len(batch)
 
         for (idx, item), target_duration, generation_duration, audio in zip(
             batch,
@@ -358,4 +382,12 @@ def synthesize_omnivoice(
     config["device"] = resolved_device
     config["postprocess_output"] = postprocess_output
     config["fit_audio"] = fit_audio
+    # Batch hiệu lực cuối cùng (sau auto theo VRAM + fallback OOM nếu có).
+    config["batch_size"] = batch_size
+    # Model vẫn giữ cache (_MODEL_CACHE) để lần dub sau không phải load lại,
+    # nhưng trả phần VRAM đệm/tạm (activation, buffer trung gian) về driver —
+    # không làm việc này thì process tích lũy dần qua mỗi lần dub, dub cùng 1
+    # video vài lần liên tiếp cuối cùng OOM dù batch/độ dài y hệt lần trước.
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return timings

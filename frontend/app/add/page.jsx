@@ -18,6 +18,7 @@ const DEFAULT_TTS_CONFIG = {
   instruction_tags: [],
   num_step: 8,
   keep_background: true,
+  batch_size: 0, // 0 = auto theo VRAM detect; >0 = từ VRAM người dùng nhập
 };
 
 const TTS_QUALITY_OPTIONS = {
@@ -33,6 +34,8 @@ const TTS_QUALITY_OPTIONS = {
     { value: 48, label: "Tối đa · 48 steps" },
   ],
 };
+
+const OMNIVOICE_BATCH_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 8, 12, 16];
 
 const TRANSLATION_PROVIDERS = [
   { id: "chatgpt", label: "ChatGPT", url: "https://chatgpt.com/" },
@@ -69,6 +72,37 @@ function asrModelLabel(preset) {
   const engine = preset?.engine ? `${preset.engine}:` : "";
   const device = [preset?.device, preset?.compute_type].filter(Boolean).join("/");
   return `${engine}${model}${device ? ` · ${device}` : ""}`;
+}
+
+function hardwareOptionStatus(recommendation, group, id) {
+  return recommendation?.availability?.[group]?.[id] || null;
+}
+
+function isHardwareOptionAvailable(recommendation, group, id) {
+  const status = hardwareOptionStatus(recommendation, group, id);
+  return !status || status.available !== false;
+}
+
+function hardwareOptionReason(recommendation, group, id) {
+  const status = hardwareOptionStatus(recommendation, group, id);
+  return status?.available === false ? (status.reason || "Không đủ phần cứng") : "";
+}
+
+// Thông số máy người dùng nhập — sống lâu hơn draft (không bị xoá khi
+// "Xóa bản nháp"), mọi lần vào trang đều dùng lại.
+const HW_STORAGE_KEY = "tubenote-hardware";
+
+function readStoredHardware() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HW_STORAGE_KEY) || "null");
+    if (saved && typeof saved === "object") {
+      return {
+        ram_gb: Number(saved.ram_gb) > 0 ? Number(saved.ram_gb) : null,
+        vram_gb: Number(saved.vram_gb) > 0 ? Number(saved.vram_gb) : 0,
+      };
+    }
+  } catch {}
+  return null;
 }
 
 function ttsModelLabel(engine) {
@@ -205,6 +239,7 @@ function normalizeTtsConfig(value, fallbackModel = "M5", fallbackEngine = "super
     instruction_tags: Array.isArray(cfg.instruction_tags) ? cfg.instruction_tags : [],
     num_step: numStep,
     keep_background: cfg.keep_background !== false,
+    batch_size: Number(cfg.batch_size) > 0 ? Math.floor(Number(cfg.batch_size)) : 0,
   };
 }
 
@@ -257,6 +292,13 @@ export default function AddPage() {
   const [ttsConfig, setTtsConfig] = useState(DEFAULT_TTS_CONFIG);
   const [speechPresets, setSpeechPresets] = useState([]);
   const [speechPreset, setSpeechPreset] = useState("cpu");
+  const [hardware, setHardware] = useState(null);
+  const [hwRam, setHwRam] = useState("");
+  const [hwVram, setHwVram] = useState("");
+  const [hwRec, setHwRec] = useState(null);
+  const [hwDirty, setHwDirty] = useState(false);
+  const [hwDetecting, setHwDetecting] = useState(false);
+  const [hwApplying, setHwApplying] = useState(false);
   const [translationMode, setTranslationMode] = useState("manual");
   const [translationModelConfig, setTranslationModelConfig] = useState(FALLBACK_TRANSLATION_MODELS);
   const [translationProvider, setTranslationProvider] = useState(FALLBACK_TRANSLATION_MODELS.default_provider);
@@ -321,37 +363,32 @@ export default function AddPage() {
     };
   }, []);
 
+  // Gộp các fetch vào 1 effect và tính default MỘT LẦN từ kết quả tất cả —
+  // tách nhiều effect sẽ dính race lúc dev (StrictMode mount đôi): lần resolve
+  // thứ hai của ttsModels ghi đè engine mà đề xuất phần cứng vừa áp.
+  // Ưu tiên: lựa chọn đã lưu trong draft > đề xuất theo RAM/VRAM (đã lưu ở
+  // HW_STORAGE_KEY nếu người dùng từng nhập, không thì theo máy detect) >
+  // default backend.
   useEffect(() => {
-    api.ttsModels()
-      .then((data) => {
-        const models = Array.isArray(data.models) ? data.models : [];
-        const engines = Array.isArray(data.engines) ? data.engines : [];
-        const presets = Array.isArray(data.speech_presets) ? data.speech_presets : [];
-        let saved = null;
-        try {
-          saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-        } catch {}
-        const savedTts = saved?.ttsConfig || saved?.tts || (saved?.ttsModel ? { model: saved.ttsModel } : null);
-        const defaultPreset = presets.find((preset) => preset.id === data.default_speech_preset) || presets[0];
-        const savedPreset = presets.find((preset) => preset.id === saved?.speechPreset);
-        const nextSpeechPreset = savedPreset?.id || defaultPreset?.id || "cpu";
-        const defaultEngineId = data.default_engine || engines[0]?.id || "supertonic";
-        const savedEngine = engines.find((item) => item.id === savedTts?.engine);
-        const engine = savedEngine || engines.find((item) => item.id === defaultEngineId) || engines[0];
-        setTtsModels(models);
-        setTtsEngines(engines);
-        setSpeechPresets(presets);
-        setSpeechPreset(nextSpeechPreset);
-        const normalizedSaved = savedTts
-          ? normalizeTtsConfig(savedTts, engine?.default_model || models[0] || "M5", engine?.id || defaultEngineId)
-          : null;
-        setTtsConfig(
-          normalizedSaved?.engine === (engine?.id || defaultEngineId)
-            ? normalizedSaved
-            : ttsConfigForEngine(engine, models.length ? models : ["M5"])
-        );
-      })
-      .catch(() => {
+    const storedHw = readStoredHardware();
+    Promise.allSettled([
+      api.ttsModels(),
+      api.hardware(),
+      storedHw
+        ? api.hardwareRecommend(storedHw.ram_gb || 0, storedHw.vram_gb || 0)
+        : Promise.resolve(null),
+    ]).then(([modelsRes, hwRes, storedRecRes]) => {
+      const hw = hwRes.status === "fulfilled" ? hwRes.value : null;
+      setHardware(hw);
+      const detected = hw?.detected || {};
+      const ramValue = storedHw?.ram_gb ?? detected.ram_gb ?? null;
+      const vramValue = storedHw ? storedHw.vram_gb : (detected.gpu?.vram_gb ?? 0);
+      setHwRam(ramValue ? String(ramValue) : "");
+      setHwVram(vramValue ? String(vramValue) : "");
+      const storedRec = storedRecRes?.status === "fulfilled" ? storedRecRes.value : null;
+      const recommendation = storedRec || hw?.recommendation || null;
+      setHwRec(recommendation);
+      if (modelsRes.status !== "fulfilled") {
         setTtsModels(["M5", "F5"]);
         setTtsEngines([]);
         setSpeechPresets([]);
@@ -363,7 +400,67 @@ export default function AddPage() {
           models: ["M5", "F5"],
           supports_clone: false,
         }, ["M5", "F5"]));
-      });
+        return;
+      }
+      const data = modelsRes.value;
+      const models = Array.isArray(data.models) ? data.models : [];
+      const engines = Array.isArray(data.engines) ? data.engines : [];
+      const presets = Array.isArray(data.speech_presets) ? data.speech_presets : [];
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      } catch {}
+      const savedTts = saved?.ttsConfig || saved?.tts || (saved?.ttsModel ? { model: saved.ttsModel } : null);
+      const recommendedPreset =
+        recommendation && presets.some((preset) => preset.id === recommendation.asr_preset)
+          ? recommendation.asr_preset
+          : null;
+      const recommendedEngineId =
+        recommendation && engines.some((item) => item.id === recommendation.tts_engine)
+          ? recommendation.tts_engine
+          : null;
+      const recommendedBatch =
+        recommendation?.tts_engine === "omnivoice" ? (recommendation.omnivoice_batch_size || 0) : 0;
+      const defaultPreset = presets.find((preset) => preset.id === data.default_speech_preset) || presets[0];
+      const fallbackPreset =
+        [defaultPreset, ...presets].find((preset) => (
+          preset && isHardwareOptionAvailable(recommendation, "asr", preset.id)
+        )) || presets[0];
+      const savedPreset = presets.find((preset) => (
+        preset.id === saved?.speechPreset &&
+        isHardwareOptionAvailable(recommendation, "asr", preset.id)
+      ));
+      const nextSpeechPreset = savedPreset?.id || recommendedPreset || fallbackPreset?.id || "cpu";
+      const defaultEngineId = recommendedEngineId || data.default_engine || engines[0]?.id || "supertonic";
+      const fallbackEngine =
+        [engines.find((item) => item.id === defaultEngineId), ...engines].find((item) => (
+          item && isHardwareOptionAvailable(recommendation, "tts", item.id)
+        )) || engines[0];
+      const savedEngine = engines.find((item) => (
+        item.id === savedTts?.engine &&
+        isHardwareOptionAvailable(recommendation, "tts", item.id)
+      ));
+      const engine = savedEngine || fallbackEngine;
+      setTtsModels(models);
+      setTtsEngines(engines);
+      setSpeechPresets(presets);
+      setSpeechPreset(nextSpeechPreset);
+      const normalizedSaved = savedTts
+        ? normalizeTtsConfig(savedTts, engine?.default_model || models[0] || "M5", engine?.id || defaultEngineId)
+        : null;
+      setTtsConfig(
+        normalizedSaved?.engine === (engine?.id || defaultEngineId)
+          ? normalizedSaved
+          : normalizeTtsConfig(
+              {
+                ...ttsConfigForEngine(engine, models.length ? models : ["M5"]),
+                batch_size: engine?.id === recommendedEngineId ? recommendedBatch : 0,
+              },
+              engine?.default_model || models[0] || "M5",
+              engine?.id || defaultEngineId,
+            )
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -985,6 +1082,14 @@ export default function AddPage() {
         : `preset:${voice.id}` === ttsVoiceChoice
     ))?.label || ttsVoiceChoice;
   const ttsQualityOptions = TTS_QUALITY_OPTIONS[selectedTtsEngine.id] || TTS_QUALITY_OPTIONS.supertonic;
+  const recommendedOmniBatch = hwRec?.tts_engine === "omnivoice"
+    ? Number(hwRec.omnivoice_batch_size) || 0
+    : 0;
+  const ttsBatchOptions = Array.from(new Set([
+    ...OMNIVOICE_BATCH_OPTIONS,
+    recommendedOmniBatch,
+    Number(ttsConfig.batch_size) || 0,
+  ])).filter((value) => value >= 0).sort((a, b) => a - b);
   const currentTranslationProvider = selectedTranslationProvider();
   const currentTranslationModels = currentTranslationProvider?.models || [];
   const translatingCount = Object.keys(translatingPrompts).length;
@@ -997,7 +1102,8 @@ export default function AddPage() {
     }, currentTtsModels[0] || "M5", selectedTtsEngine.id || "supertonic"));
   }
 
-  async function changeTtsEngine(engineId) {
+  async function changeTtsEngine(engineId, recommendation = hwRec) {
+    if (!isHardwareOptionAvailable(recommendation, "tts", engineId)) return;
     const engine = availableTtsEngines.find((item) => item.id === engineId) || fallbackTtsEngine;
     setTtsConfig(ttsConfigForEngine(engine, currentTtsModels));
     setValidated({});
@@ -1009,7 +1115,84 @@ export default function AddPage() {
   }
 
   function changeAsrModel(presetId) {
+    if (!isHardwareOptionAvailable(hwRec, "asr", presetId)) return;
     setSpeechPreset(presetId);
+  }
+
+  const detectedHardware = hardware?.detected;
+  const hardwareHint = detectedHardware
+    ? `Phát hiện: ${detectedHardware.gpu
+        ? `${detectedHardware.gpu.name} · ${detectedHardware.gpu.vram_gb}GB VRAM`
+        : "không có GPU NVIDIA"}${detectedHardware.ram_gb ? ` · RAM ${detectedHardware.ram_gb}GB` : ""}${detectedHardware.cpu_cores ? ` · ${detectedHardware.cpu_cores} cores` : ""}`
+    : "Không đọc được thông tin máy — nhập theo phần cứng của bạn.";
+  const hwRecPresetLabel = hwRec
+    ? (availableSpeechPresets.find((preset) => preset.id === hwRec.asr_preset)?.label || hwRec.asr_preset)
+    : "";
+  const hwRecSummary = hwRec
+    ? `${hwRecPresetLabel} · ${hwRec.tts_engine === "omnivoice" ? "OmniVoice - GPU" : "Supertonic - CPU"}` +
+      (hwRec.tts_engine === "omnivoice" && hwRec.omnivoice_batch_size
+        ? ` · batch ${hwRec.omnivoice_batch_size}`
+        : "") +
+      ` · ${hwRec.whisper_cpu_threads} threads`
+    : "";
+
+  async function applyHardwareRecommendation(rec) {
+    if (!rec) return;
+    if (availableSpeechPresets.some((preset) => preset.id === rec.asr_preset)) {
+      setSpeechPreset(rec.asr_preset);
+    }
+    const batch = rec.tts_engine === "omnivoice" ? (rec.omnivoice_batch_size || 0) : 0;
+    if (selectedTtsEngine.id !== rec.tts_engine) {
+      await changeTtsEngine(rec.tts_engine, rec);
+      setTtsConfig((cur) => normalizeTtsConfig(
+        { ...cur, batch_size: batch }, cur.model || "M5", cur.engine || rec.tts_engine,
+      ));
+    } else {
+      updateTtsConfig({ batch_size: batch });
+    }
+  }
+
+  function onHardwareInputChange(field, value) {
+    if (field === "ram") setHwRam(value);
+    else setHwVram(value);
+    setHwDirty(true);
+  }
+
+  async function detectHardwareInput() {
+    setHwDetecting(true);
+    setError("");
+    try {
+      const hw = await api.hardware();
+      setHardware(hw);
+      const detected = hw?.detected || {};
+      setHwRam(detected.ram_gb ? String(detected.ram_gb) : "");
+      setHwVram(detected.gpu?.vram_gb ? String(detected.gpu.vram_gb) : "");
+      setHwDirty(true);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setHwDetecting(false);
+    }
+  }
+
+  async function applyHardwareInputs() {
+    const ram = Number(hwRam) || 0;
+    const vram = Number(hwVram) || 0;
+    setHwApplying(true);
+    setError("");
+    try {
+      const rec = await api.hardwareRecommend(ram, vram);
+      setHwRec(rec);
+      try {
+        localStorage.setItem(HW_STORAGE_KEY, JSON.stringify({ ram_gb: ram, vram_gb: vram }));
+      } catch {}
+      await applyHardwareRecommendation(rec);
+      setHwDirty(false);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setHwApplying(false);
+    }
   }
 
   async function changeTtsModel(engineId) {
@@ -1082,6 +1265,64 @@ export default function AddPage() {
                 {loading ? "Đang tải" : "Load"}
               </button>
             </div>
+            <div className="load-options hw-options">
+              <label className="tts-select">
+                <span>RAM (GB)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={hwRam}
+                  onChange={(event) => onHardwareInputChange("ram", event.target.value)}
+                  disabled={loading || dubbing}
+                />
+              </label>
+              <label className="tts-select">
+                <span>VRAM GPU (GB)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="0 = không có"
+                  value={hwVram}
+                  onChange={(event) => onHardwareInputChange("vram", event.target.value)}
+                  disabled={loading || dubbing}
+                />
+              </label>
+              <em>{hardwareHint}</em>
+              <div className="hw-actions">
+                <button
+                  type="button"
+                  onClick={detectHardwareInput}
+                  disabled={loading || dubbing || hwDetecting || hwApplying}
+                >
+                  {hwDetecting ? "Đang phát hiện" : "Tự phát hiện"}
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={applyHardwareInputs}
+                  disabled={loading || dubbing || hwDetecting || hwApplying || Boolean(!hwDirty && hwRec)}
+                >
+                  {hwApplying ? "Đang áp dụng" : "Áp dụng cấu hình"}
+                </button>
+              </div>
+            </div>
+            {(hwRecSummary || hwDirty) && (
+              <div className={`hw-recommend${hwDirty ? " pending" : ""}`}>
+                {hwRecSummary ? (
+                  <>
+                    {hwDirty ? "Đang dùng cấu hình đã áp dụng: " : "Đề xuất đang áp dụng: "}
+                    <b>{hwRecSummary}</b>
+                  </>
+                ) : (
+                  "Chưa có cấu hình phần cứng đã áp dụng."
+                )}
+                {hwDirty && (
+                  <span> Thông số RAM/VRAM đã đổi, nhấn áp dụng cấu hình để cập nhật lựa chọn.</span>
+                )}
+              </div>
+            )}
             <div className="load-options">
               <label className="tts-select">
                 <span>Mô hình ASR</span>
@@ -1090,15 +1331,58 @@ export default function AddPage() {
                   onChange={(event) => changeAsrModel(event.target.value)}
                   disabled={loading || dubbing || currentAsrOptions.length <= 1}
                 >
-                  {currentAsrOptions.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {asrModelLabel(preset)}
-                    </option>
-                  ))}
+                  {currentAsrOptions.map((preset) => {
+                    const reason = hardwareOptionReason(hwRec, "asr", preset.id);
+                    return (
+                      <option key={preset.id} value={preset.id} disabled={Boolean(reason)}>
+                        {asrModelLabel(preset)}{reason ? ` (${reason})` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
               {selectedSpeechPreset.description && (
                 <em>{selectedSpeechPreset.description}</em>
+              )}
+            </div>
+            <div className="load-options tts-engine-options">
+              <label className="tts-select">
+                <span>Mô hình TTS</span>
+                <select
+                  value={selectedTtsEngine.id}
+                  onChange={(event) => changeTtsModel(event.target.value)}
+                  disabled={loading || dubbing || currentTtsEngineOptions.length <= 1}
+                >
+                  {currentTtsEngineOptions.map((engine) => {
+                    const reason = hardwareOptionReason(hwRec, "tts", engine.id);
+                    return (
+                      <option key={engine.id} value={engine.id} disabled={Boolean(reason)}>
+                        {ttsModelLabel(engine)}{reason ? ` (${reason})` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              {selectedTtsEngine.id === "omnivoice" && (
+                <label className="tts-select">
+                  <span>Batch size</span>
+                  <select
+                    value={Number(ttsConfig.batch_size) || 0}
+                    onChange={(event) => updateTtsConfig({ batch_size: Number(event.target.value) || 0 })}
+                    disabled={loading || dubbing}
+                  >
+                    {ttsBatchOptions.map((value) => (
+                      <option key={value} value={value}>
+                        {value === 0
+                          ? "Auto"
+                          : `${value}${value === recommendedOmniBatch ? " · đề xuất" : ""}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {selectedTtsEngine.description && (
+                <em>{selectedTtsEngine.description}</em>
               )}
             </div>
           </div>
@@ -1142,21 +1426,7 @@ export default function AddPage() {
                     </div>
                     {selectedTtsEngine.description && <em>{selectedTtsEngine.description}</em>}
                   </div>
-	                  <div className="tts-grid tts-grid-three">
-	                    <label className="tts-select">
-	                      <span>Mô hình TTS</span>
-	                      <select
-	                        value={selectedTtsEngine.id}
-	                        onChange={(event) => changeTtsModel(event.target.value)}
-	                        disabled={loading || dubbing || currentTtsEngineOptions.length <= 1}
-	                      >
-	                        {currentTtsEngineOptions.map((engine) => (
-	                          <option key={engine.id} value={engine.id}>
-	                            {ttsModelLabel(engine)}
-	                          </option>
-	                        ))}
-	                      </select>
-	                    </label>
+	                  <div className="tts-grid">
 	                    <label className="tts-select">
 	                      <span>Giọng đọc</span>
 	                      <select

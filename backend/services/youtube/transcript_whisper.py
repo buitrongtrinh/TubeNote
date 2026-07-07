@@ -108,12 +108,21 @@ def _get_openai_model(language: str):
     return _MODELS[key]
 
 
+def _resolve_cpu_threads(raw: object) -> int:
+    """0 = auto theo số core máy (clamp ``hardware.max_auto_threads``)."""
+    threads = int(raw or 0)
+    if threads <= 0:
+        threads = min(os.cpu_count() or 4, CFG.hardware.max_auto_threads)
+    return threads
+
+
 def _get_faster_model(cfg: dict):
+    cpu_threads = _resolve_cpu_threads(cfg.get("cpu_threads"))
     key = "faster:{model}:{device}:{compute}:{cpu_threads}:{num_workers}".format(
         model=cfg.get("model"),
         device=cfg.get("device"),
         compute=cfg.get("compute_type"),
-        cpu_threads=cfg.get("cpu_threads") or 0,
+        cpu_threads=cpu_threads,
         num_workers=cfg.get("num_workers") or 1,
     )
     if key in _MODELS:
@@ -133,7 +142,6 @@ def _get_faster_model(cfg: dict):
     model_name = _FASTER_MODEL_ALIASES.get(model_name.lower(), model_name)
     device = str(cfg.get("device") or "cuda")
     compute_type = str(cfg.get("compute_type") or ("float16" if device == "cuda" else "int8"))
-    cpu_threads = int(cfg.get("cpu_threads") or 0)
     num_workers = int(cfg.get("num_workers") or 1)
     print(
         f"[whisper] Loading faster-whisper {model_name} on {device} ({compute_type})…",
