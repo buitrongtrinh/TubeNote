@@ -1,21 +1,72 @@
-# TubeNote services — chạy 1 lần, để chạy ngầm.
+# TubeNote — full stack qua Docker.
 #
 # Usage:
-#   docker compose up -d        # start (lần đầu pull image ~150 MB)
-#   docker compose ps           # status
-#   docker compose logs -f      # xem log
-#   docker compose down         # stop + remove containers
-#   docker compose stop         # chỉ stop (giữ container)
-#   docker compose start        # start lại sau khi stop
+#   docker compose up -d --build     # build + chạy cả backend, frontend, SearXNG
+#   docker compose logs -f backend   # xem log
+#   docker compose down              # dừng + xoá containers (data/ giữ nguyên)
+#
+# GPU (NVIDIA, cần nvidia-container-toolkit trên host):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# Lưu ý Fedora/SELinux: bind mount dùng cờ ":z" để container ghi được.
 
 services:
+  backend:
+    build:
+      context: .
+      # TORCH_FLAVOR=cpu (mặc định) — docker-compose.gpu.yml override thành cuda.
+    # Tag riêng với bản GPU (docker-compose.gpu.yml) để build 1 bản không đè
+    # mất bản kia — chuyển qua lại không cần rebuild nếu cả 2 đã build sẵn.
+    image: tubenote-backend:cpu
+    container_name: tubenote-backend
+    ports:
+      - "127.0.0.1:8010:8010"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Trong mạng compose, SearXNG là service "searxng" cổng nội bộ 8080.
+      - SEARXNG_URL=http://searxng:8080
+      # Container không có trình duyệt — vô hiệu YT_COOKIES_BROWSER từ .env,
+      # rơi về cookie file trong ./cookies (nếu có) hoặc guest request.
+      - YT_COOKIES_BROWSER=
+      # Cho phép tải embedding model (bge-m3) vào cache volume ở lần chạy đầu
+      # (config.yaml đặt local_files_only: true cho máy đã cache sẵn).
+      - EMBEDDING_LOCAL_FILES_ONLY=0
+    volumes:
+      - ./data:/app/data:z
+      - ./cookies:/app/cookies:z
+      # Cache model (HuggingFace + whisper + torch hub) — sống qua các lần
+      # rebuild image, tránh tải lại vài GB model.
+      - model-cache:/root/.cache
+    depends_on:
+      - searxng
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Bake vào lúc `next build` (rewrites nằm trong routes-manifest,
+        # đổi env runtime không có tác dụng).
+        NEXT_PUBLIC_API: http://backend:8010
+    container_name: tubenote-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   searxng:
     image: searxng/searxng:latest
     container_name: tubenote-searxng
     ports:
       - "8888:8080"
     volumes:
-      - ./searxng_config:/etc/searxng:rw
+      - ./searxng_config:/etc/searxng:rw,z
     restart: unless-stopped
     environment:
       - SEARXNG_BASE_URL=http://localhost:8888/
+
+volumes:
+  model-cache:

@@ -12,6 +12,9 @@ cookies/*.txt
 # Streamlit secrets
 .streamlit/secrets.toml
 
+# Nội dung dùng riêng cho CV, không phải tài liệu public của dự án
+CV_NOTES.md
+
 # ==============================================================================
 # Runtime output — code tự tạo (os.makedirs)
 # ==============================================================================
@@ -47,11 +50,13 @@ tmp/
 *.m4a
 *.mp4
 *.mkv
-# Ngoại lệ: voice preset gốc của 2 TTS engine — asset bắt buộc để dropdown
-# giọng hoạt động trên máy người clone repo (config.yaml tham chiếu tới).
-# Voice trích từ video người dùng lúc runtime nằm ở data/voice_clones/ (đã
-# ignore qua data/), KHÔNG nằm ở đây.
-!voice_clones/**/*.wav
+# Ngoại lệ: reference_audio cho voice cloning của OmniVoice (config.yaml
+# tts.omnivoice_voices trỏ tới voice_clones/omnivoice/*.wav) — asset bắt buộc
+# để clone giọng hoạt động trên máy người clone repo. Supertonic KHÔNG cần
+# file wav (voice style M5/F5 có sẵn trong package supertonic, không đọc từ
+# repo). Voice trích từ video người dùng lúc runtime nằm ở data/voice_clones/
+# (đã ignore qua data/), KHÔNG nằm ở đây.
+!voice_clones/omnivoice/*.wav
 
 # ==============================================================================
 # Python

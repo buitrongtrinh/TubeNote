@@ -1,0 +1,17 @@
+# Override bật GPU NVIDIA cho backend (Whisper CUDA + OmniVoice).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# Yêu cầu host: driver NVIDIA + nvidia-container-toolkit
+# (Fedora: sudo dnf install nvidia-container-toolkit && sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker)
+#
+# Image GPU nặng hơn nhiều (torch bản CUDA ~5GB) — chỉ build khi thật sự dùng.
+
+services:
+  backend:
+    build:
+      args:
+        TORCH_FLAVOR: cuda
+    # Tag riêng với bản CPU (docker-compose.yml) — không build đè lên nhau.
+    image: tubenote-backend:gpu
+    gpus: all

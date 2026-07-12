@@ -1,0 +1,49 @@
+# Build context cho Dockerfile backend (root). Frontend có context riêng
+# (./frontend) với .dockerignore riêng — loại hẳn frontend/ khỏi context này.
+frontend/
+
+# Secrets / dữ liệu cá nhân — KHÔNG được vào image
+.env
+.env.*
+cookies/
+
+# Runtime output — mount volume lúc chạy, không nướng vào image
+data/
+output/
+chroma_langchain_db/
+
+# Git / tooling
+.git/
+.gitignore
+.claude/
+.agents/
+.codex/
+.vscode/
+.idea/
+
+# Python noise
+__pycache__/
+*.pyc
+.venv/
+
+# Scratch / demo / docs — không cần trong image runtime
+scratch/
+TTS_model_demo/
+translate_sub_demo/
+demo/
+docs/
+tmp/
+*.ipynb
+*.log
+
+# Media binaries
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.mkv
+# Ngoại lệ: reference audio OmniVoice (Dockerfile COPY voice_clones)
+!voice_clones/omnivoice/*.wav
+
+# SearXNG config — mount từ compose, không thuộc backend image
+searxng_config/
