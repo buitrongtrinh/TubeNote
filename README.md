@@ -7,6 +7,8 @@
 [![Hardware](https://img.shields.io/badge/Hardware-CPU--only%20OK%20%7C%20GPU%20optional-2ea44f)](#prerequisites)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**[English](README.md) | [Tiếng Việt](README.vi.md)**
+
 TubeNote is a local-first AI video dubbing and video Q&A application. It turns a
 YouTube video into a Vietnamese dubbed video, keeps editable subtitles and timing
 metadata, and adds a RAG chat panel so users can ask questions about the video.
@@ -18,32 +20,43 @@ over processed transcripts.
 
 **The entire pipeline runs on a CPU-only machine** (faster-whisper `small.en`
 int8 + Supertonic TTS). An NVIDIA GPU is optional and unlocks the
-higher-quality path: OmniVoice TTS with voice cloning and `medium.en` ASR.
+higher-quality path: OmniVoice TTS with voice cloning and, with enough VRAM,
+`large-v3-turbo` ASR (auto-picked over `medium.en` when available — faster and
+more accurate at nearly the same VRAM cost, see `docs/dubbing.md`).
 
 ![TubeNote detailed architecture](docs/assets/tubenote-architecture.webp)
 
 ## Demo
 
-Click a thumbnail to watch on YouTube:
+| Video | Link |
+| --- | --- |
+| GUI walkthrough | [Watch on YouTube](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) |
+| Dubbed output sample | [Watch on YouTube](https://www.youtube.com/watch?v=Y1PnEIHituE) |
 
-| GUI walkthrough | Dubbed output sample |
-| :---: | :---: |
-| [![GUI walkthrough](https://img.youtube.com/vi/YOUR_GUI_DEMO_VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) | [![Dubbed output sample](https://img.youtube.com/vi/Y1PnEIHituE/hqdefault.jpg)](https://www.youtube.com/watch?v=Y1PnEIHituE) |
+<!-- GUI walkthrough is a placeholder link — replace YOUR_GUI_DEMO_VIDEO_ID
+     once that video is recorded. -->
 
-<!-- Still need a GUI walkthrough video: replace YOUR_GUI_DEMO_VIDEO_ID above
-     (2 places, same id) before publishing. -->
+**Library:**
 
-**Library, in both light and dark theme:**
+![TubeNote library](docs/assets/screenshot-library.webp)
 
-![TubeNote library, light and dark theme](docs/assets/screenshot-library.webp)
+**Drafts: videos loaded but not dubbed yet:**
 
-**Create Dubbing wizard: hardware auto-detection, TTS engine/voice/quality, translation prompts:**
+![TubeNote drafts](docs/assets/screenshot-drafts.webp)
 
-![TubeNote create dubbing wizard](docs/assets/screenshot-create.webp)
+**Dubbing, step by step:**
 
-**Video page: dubbed player, bilingual transcript, per-segment regeneration:**
+1. Create Dubbing wizard — hardware auto-detection, TTS engine/voice/quality:
 
-![TubeNote video page with player and transcript](docs/assets/screenshot-watch.webp)
+   ![TubeNote create dubbing wizard](docs/assets/screenshot-create.webp)
+
+2. Translate content — copy prompts to ChatGPT (or translate via API) and validate batches before TTS:
+
+   ![TubeNote translation step](docs/assets/screenshot-translate.webp)
+
+3. Video page — dubbed player, bilingual transcript, per-segment regeneration:
+
+   ![TubeNote video page with player and transcript](docs/assets/screenshot-watch.webp)
 
 ## What TubeNote Does
 
@@ -70,7 +83,7 @@ Click a thumbnail to watch on YouTube:
   tables in `config.yaml`; batch still halves itself on CUDA OOM instead of
   failing the job, and `scripts/measure_vram.py` measures real usage to tune
   the tables.
-- Six ASR presets (tiny.en → medium.en, CPU int8 and CUDA fp16) through
+- Seven ASR presets (tiny.en → large-v3-turbo, CPU int8 and CUDA fp16) through
   faster-whisper/CTranslate2, with word-timestamp-based sentence re-splitting
   for TTS-friendly segment boundaries.
 - Two translation modes:
@@ -93,7 +106,7 @@ Click a thumbnail to watch on YouTube:
 
 | Area | Stack |
 | --- | --- |
-| Frontend | Next.js 14, React, Vidstack |
+| Frontend | Next.js 14, React, Vidstack, react-markdown |
 | Backend | FastAPI, Python 3.11 |
 | Video ingest | `yt-dlp`, YouTube subtitles |
 | ASR | faster-whisper, CTranslate2 |
@@ -146,55 +159,65 @@ notes and pipeline behavior are documented in the files above.
 
 ## Prerequisites
 
-- Python 3.11.
-- Node.js 20 recommended.
-- `ffmpeg` installed on PATH is recommended. Some operations also use
-  `imageio-ffmpeg` as a fallback.
+- NVIDIA GPU is recommended for OmniVoice and faster Whisper GPU mode.
+  OmniVoice needs **≥ 3GB VRAM** (measured minimum ~2.5GB, +buffer for
+  driver/CUDA context overhead); below that it falls back to Supertonic CPU.
 - CPU-only machines can run the default Supertonic + Whisper CPU path, but ASR
   and TTS will be slower.
-- NVIDIA GPU is recommended for OmniVoice and faster Whisper GPU mode.
-- Docker is optional and only needed if you enable local SearXNG web search.
+- Runs via Docker Compose — see "Setup & Run (Docker)" below. Requires
+  [Docker Engine](https://docs.docker.com/engine/install/) with the Compose
+  plugin (Docker Desktop on Windows/macOS).
 
-## Setup
+## YouTube Cookies
 
-### Backend
+Cookies are optional. Most public videos load fine without them. Add cookies
+when you hit one of these:
 
-Pick the variant that matches your machine.
+- Age-restricted, private, or members-only videos.
+- YouTube's bot-detection blocking metadata/subtitle/audio requests for your
+  IP (uncommon for normal usage, more likely with heavy/repeated requests).
 
-**CPU-only machines** — install the CPU build of PyTorch first (several GB
-smaller, skips every CUDA download), then the CPU-safe requirements:
+**In this Docker setup, cookies must be a file** — the app also supports
+auto-detecting cookies from a locally installed browser
+(`YT_COOKIES_BROWSER=chrome`), but that only works when the app runs directly
+on your machine with a real browser present. A container has no browser, so
+`YT_COOKIES_BROWSER` is explicitly disabled in `docker-compose.yml` and does
+nothing here — use the file export below instead.
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -r requirements.txt
+```text
+YT_COOKIES_DIR=cookies
+# or
+YT_COOKIES_PATH=cookies/primary.txt
 ```
 
-**Machines with an NVIDIA GPU** — add `requirements-gpu.txt`, which holds the
-CUDA 12 runtime wheels (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`) that
-faster-whisper GPU mode needs:
+To create a cookies file:
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt -r requirements-gpu.txt
+1. Install a browser extension that exports cookies in Netscape `cookies.txt`
+   format, for example "Get cookies.txt LOCALLY".
+2. Log in to YouTube in that browser.
+3. Export cookies for `youtube.com`.
+4. Save the file as `cookies/primary.txt`.
+
+The `cookies/` directory is ignored by git. Do not commit exported cookies.
+This file is a login credential — treat it like a password: exported cookies
+can degrade or get revoked if used in unusual, high-frequency automated
+patterns, so avoid scripting rapid repeated requests against it.
+
+## Optional Web Search
+
+Video-local RAG works without web search. The Docker stack (below) starts
+SearXNG for you automatically as part of the full stack; override the URL if
+you point the app at a different instance:
+
+```text
+SEARXNG_URL=http://localhost:8888
 ```
 
-`run.sh` adds the installed NVIDIA wheel library directories to
-`LD_LIBRARY_PATH` automatically. If your PyTorch/OmniVoice setup needs a
-specific CUDA/MPS/XPU build, install the matching `torch`/`torchaudio` wheels
-first, then the requirements files.
+## Setup & Run (Docker)
 
-### Frontend
-
-```bash
-cd frontend
-npm install
-cd ..
-```
+Requires [Docker Engine](https://docs.docker.com/engine/install/) with the
+Compose plugin (Docker Desktop on Windows/macOS). No local Python, Node.js, or
+`ffmpeg` install needed — everything runs inside the containers.
 
 ### Environment
 
@@ -233,72 +256,53 @@ GOOGLE_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
-## YouTube Cookies
+### Run
 
-Cookies are optional, but useful when YouTube blocks unauthenticated subtitle or
-media requests.
-
-```text
-YT_COOKIES_DIR=cookies
-# or
-YT_COOKIES_PATH=cookies/primary.txt
-```
-
-To create a cookies file:
-
-1. Install a browser extension that exports cookies in Netscape `cookies.txt`
-   format, for example "Get cookies.txt LOCALLY".
-2. Log in to YouTube in that browser.
-3. Export cookies for `youtube.com`.
-4. Save the file as `cookies/primary.txt`.
-
-The `cookies/` directory is ignored by git. Do not commit exported cookies.
-
-Alternatively, let `yt-dlp` read cookies from your browser profile:
-
-```text
-YT_COOKIES_BROWSER=chrome
-```
-
-## Optional Web Search
-
-Video-local RAG works without web search. If you want to experiment with web
-search fallback, run SearXNG separately and configure the URL:
+The whole stack (backend + frontend + SearXNG) can run in containers:
 
 ```bash
-docker compose up -d searxng
+docker compose up -d --build
 ```
 
-```text
-SEARXNG_URL=http://localhost:8888
-```
+- Frontend: `http://localhost:3000` — Backend: `http://localhost:8010` (loopback only).
+- The default image is **CPU-only** (CPU build of PyTorch, much smaller than
+  the CUDA one). ASR runs `small.en` int8 and TTS uses Supertonic.
+- `./data` and `./cookies` are bind-mounted onto the host, so generated media
+  and subtitles are easy to inspect outside the container. Model downloads
+  (Whisper, bge-m3, TTS) are cached in the `model-cache` volume and survive
+  image rebuilds.
+- First run downloads several GB of models on demand — later runs are fast.
 
-## Run
+**GPU (NVIDIA)** — enables CUDA Whisper presets and OmniVoice.
+
+- **Linux**: requires the
+  [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+  installed on the host first (a driver alone is not enough — this is what
+  lets the container see the GPU at all).
+- **Windows**: use Docker Desktop with the WSL2 backend + an up-to-date
+  NVIDIA driver — follow
+  [NVIDIA's WSL2 CUDA guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+  instead of the toolkit install above.
 
 ```bash
-./run.sh
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-Default URLs:
+Verified end-to-end on an RTX 4050 Laptop GPU (Fedora host): container
+correctly detects the GPU, `/api/hardware` recommends `gpu_turbo` + OmniVoice,
+image is ~14GB (vs ~5.4GB CPU-only).
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8010`
-- Backend docs: `http://localhost:8010/docs`
+Notes:
 
-`run.sh` detects `.venv/bin/python`, then falls back to
-`~/miniconda3/envs/tubenote`, then to `python3`. Override when needed:
-
-```bash
-PYTHON_BIN=/path/to/python BACKEND_PORT=8010 ./run.sh
-```
-
-Manual run:
-
-```bash
-python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8010
-cd frontend
-NEXT_PUBLIC_API=http://localhost:8010 npm run dev
-```
+- Cookies: see "YouTube Cookies" above — the `cookies/` folder is mounted into
+  the container either way.
+- On SELinux hosts (Fedora), the compose file already uses `:z` on bind
+  mounts. Files created by the container in `./data` end up owned by root on
+  the host — run `sudo chown -R $USER data` if you need to edit them directly.
+- CPU and GPU builds use separate image tags (`tubenote-backend:cpu` and
+  `tubenote-backend:gpu`), so building one does not overwrite the other — both
+  can be built and kept around, switch between them by picking the matching
+  `docker compose` command.
 
 ## Typical Workflow
 
@@ -343,53 +347,6 @@ data/logs/              CSV timing/performance logs
 data/voice_clones/      Runtime voice references generated from source videos
 ```
 
-## Checks
-
-```bash
-python -m compileall -q backend
-python -m unittest discover -s backend/tests -t .
-cd frontend
-npm run build
-```
-
-Use the project environment Python when dependencies are installed outside the
-default shell Python, for example:
-
-```bash
-~/miniconda3/envs/tubenote/bin/python -m unittest discover -s backend/tests -t .
-```
-
-## Troubleshooting
-
-### `Port 8010 đang bận`
-
-An old backend process is still using the backend port. Stop it before rerunning:
-
-```bash
-pkill -f 'uvicorn backend.main'
-```
-
-### The UI first shows `Internal Server Error`, then works after refresh
-
-This usually means Next.js opened before FastAPI finished startup. The first
-frontend request to `/api/library` can fail if the proxy target is not ready
-yet. Wait a few seconds and refresh, or start backend manually before frontend.
-
-### `libcublas.so.12` or cuDNN errors
-
-faster-whisper GPU mode needs CUDA runtime libraries. Install the CUDA 12
-NVIDIA wheels from `requirements-gpu.txt`, or switch ASR to CPU mode.
-
-### Demucs downloads weights or fails on first run
-
-Demucs may download model weights on first background-separation use. If
-background preservation is not needed, disable it in the dubbing UI.
-
-### RAG embedding model changes
-
-Changing `embedding.model` changes vector dimensions and embedding space. Delete
-`data/chroma/` before rebuilding indexes.
-
 ## Project Limitations
 
 - Runtime jobs are stored in memory. A backend restart loses active job status.
@@ -400,19 +357,6 @@ Changing `embedding.model` changes vector dimensions and embedding space. Delete
   better than noisy speech with overlapping vocals.
 - Generated media and downloaded YouTube content are intentionally excluded from
   the public repository.
-
-## CV Summary
-
-TubeNote - Personal AI Video Dubbing and RAG Assistant.
-
-Built a full-stack application that extracts YouTube transcripts, translates
-them into Vietnamese, generates dubbed speech with multiple TTS engines, aligns
-audio/subtitles, preserves background audio, and provides hybrid RAG-based Q&A
-over processed video content.
-
-Tech: Next.js, React, Vidstack, FastAPI, faster-whisper, CTranslate2, Chroma,
-LangChain, BM25, BAAI/bge-m3, DeepSeek/OpenAI/Gemini/Anthropic APIs,
-Supertonic, OmniVoice, Demucs, ffmpeg.
 
 ## License
 
