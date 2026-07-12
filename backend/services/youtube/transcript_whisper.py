@@ -176,14 +176,13 @@ def _release_models() -> None:
 # thật, nên có thể dính 2 câu làm 1 (nói nhanh, ít nghỉ) hoặc lệch mốc
 # đầu/cuối so với từ thật. Khi word_timestamps=True, ta bỏ hẳn ranh giới
 # segment thô của Whisper, phẳng hoá TOÀN BỘ từ của audio thành 1 dòng thời
-# gian duy nhất rồi tự dựng lại câu từ 3 tín hiệu: gap giữa 2 từ, dấu kết
-# câu, và giới hạn cứng số từ (phòng trường hợp nói liền một mạch không hề
-# nghỉ, như thực tế đã gặp ở giọng đọc nhanh).
+# gian duy nhất rồi tự dựng lại câu từ các tín hiệu: gap giữa 2 từ, dấu kết
+# câu; câu vượt ngưỡng max_words được cắt mềm tại dấu phẩy/liên từ — không
+# bao giờ cắt cứng theo đếm từ (mảnh câu cụt dịch + đọc TTS đều tệ).
 
 _SOFT_PAUSE_SUFFIXES = (",", ";", "-")
 _SENTENCE_END_SUFFIXES = (".", "!", "?", "…")
 _SOFT_CONJUNCTIONS = {"and", "but", "because", "so", "which", "that"}
-_NUMBER_CONTINUATION_RE = re.compile(r"^[,.]\d")
 
 
 def _is_soft_pause(word: dict) -> bool:
@@ -196,11 +195,6 @@ def _is_sentence_end(word: dict) -> bool:
 
 def _is_conjunction(word: dict) -> bool:
     return word["word"].strip(".,;-").lower() in _SOFT_CONJUNCTIONS
-
-
-def _looks_like_number_continuation(word: dict) -> bool:
-    """True nếu word là mảnh số bị tokenizer tách rời (vd '4,000' -> '4' + ',000')."""
-    return bool(_NUMBER_CONTINUATION_RE.match(word["word"]))
 
 
 def _words_to_entry(words: list[dict], i: int, j: int) -> TranscriptEntry:
@@ -222,12 +216,16 @@ def _find_balanced_cut(candidates: list[int], i: int, j: int) -> int:
 
 
 def _split_long_run(words: list[dict], i: int, j: int, max_words: int) -> list[tuple[int, int]]:
-    """Chia đệ quy [i, j) sao cho mọi dải con <= max_words từ.
+    """Chia đệ quy [i, j) khi vượt max_words — CHỈ tại điểm cắt tự nhiên.
 
-    Ưu tiên cắt tại dấu phẩy/chấm phẩy/gạch ngang gần giữa đoạn nhất (câu
-    nghe tự nhiên hơn); nếu không có, thử liên từ (and/but/because/...);
-    chỉ cắt cứng theo số từ khi không còn lựa chọn nào khác, và né không
-    cắt ngay trước 1 mảnh số bị tokenizer tách rời (vd '4' | ',000 tokens,').
+    Ưu tiên dấu phẩy/chấm phẩy/gạch ngang gần giữa đoạn nhất; không có thì
+    liên từ (and/but/because/...) — cắt TRƯỚC liên từ để nó mở đầu vế sau
+    (vế trước kết thúc bằng "because" lơ lửng thì dịch lẫn TTS đều hụt).
+    KHÔNG còn cắt cứng theo đếm từ: cắt giữa cụm từ đang dang dở cho ra hai
+    mảnh câu cụt — bản dịch ngang phè và giọng đọc sai nhịp; một câu dài
+    trọn vẹn đọc lên vẫn tự nhiên (câu quá tải đã có cảnh báo mật độ ở UI).
+    ``max_words`` vì vậy là NGƯỠNG KÍCH HOẠT cắt mềm, không phải trần cứng —
+    đoạn không có điểm bấu víu nào được giữ nguyên.
     """
     if j - i <= max_words:
         return [(i, j)]
@@ -235,17 +233,13 @@ def _split_long_run(words: list[dict], i: int, j: int, max_words: int) -> list[t
     soft_candidates = [m for m in range(i + 1, j - 1) if _is_soft_pause(words[m])]
     k = _find_balanced_cut(soft_candidates, i, j)
     if k == -1:
-        conj_candidates = [m for m in range(i + 1, j - 1) if _is_conjunction(words[m])]
+        # Ứng viên là m-1 (từ ngay TRƯỚC liên từ) để vế sau mở đầu bằng liên
+        # từ; range từ i+2 giữ vế đầu không rỗng.
+        conj_candidates = [m - 1 for m in range(i + 2, j - 1) if _is_conjunction(words[m])]
         k = _find_balanced_cut(conj_candidates, i, j)
 
     if k == -1:
-        cut = min(i + max_words - 1, j - 2)
-        while cut + 1 < j - 1 and _looks_like_number_continuation(words[cut + 1]):
-            cut += 1
-        return (
-            [(i, cut + 1)]
-            + _split_long_run(words, cut + 1, j, max_words)
-        )
+        return [(i, j)]
 
     return (
         _split_long_run(words, i, k + 1, max_words)
@@ -294,12 +288,13 @@ def _split_into_entries(
     words: list[dict], max_words: int, pause_alpha: float, min_words: int = 1,
 ) -> list[TranscriptEntry]:
     """Dựng lại 'câu' từ dòng từ phẳng: cắt khi gap thời gian giữa 2 từ liên
-    tiếp >= pause_alpha, khi gặp từ kết câu (.!?…), hoặc khi vượt quá
-    max_words (xem ``_split_long_run``); rồi gộp lại các dải < min_words từ
+    tiếp >= pause_alpha, khi gặp từ kết câu (.!?…); câu vượt max_words được
+    cắt mềm tại dấu phẩy/liên từ nếu có (xem ``_split_long_run`` — không có
+    thì giữ nguyên, không cắt cứng); rồi gộp lại các dải < min_words từ
     vào dải liền kề gần hơn (xem ``_merge_short_ranges``).
 
-    ``max_words <= 0`` tắt hẳn việc cắt theo số từ (kể cả cắt cứng lẫn ưu
-    tiên cắt tại dấu phẩy/liên từ) — chỉ còn cắt theo gap/dấu kết câu.
+    ``max_words <= 0`` tắt hẳn tầng cắt mềm theo độ dài (kể cả tại dấu
+    phẩy/liên từ) — chỉ còn cắt theo gap/dấu kết câu.
     """
     ranges: list[tuple[int, int]] = []
     i = 0
@@ -355,7 +350,7 @@ def _transcribe_openai(
         kwargs["language"] = language
     result = model.transcribe(audio_path, **kwargs)
     if on_progress:
-        on_progress("🎙️ Đang nhận diện giọng nói bằng Whisper 100%")
+        on_progress("Đang nhận diện giọng nói bằng Whisper 100%")
     return _segments_to_transcript(result.get("segments", []))
 
 
@@ -398,7 +393,7 @@ def _faster_segments_to_transcript_with_progress(
         if on_progress and total_duration > 0:
             pct = max(0, min(99, int(end * 100 / total_duration)))
             if pct >= last_pct + 2:
-                on_progress(f"🎙️ Đang nhận diện giọng nói bằng Whisper {pct}%")
+                on_progress(f"Đang nhận diện giọng nói bằng Whisper {pct}%")
                 last_pct = pct
         if not text:
             continue
@@ -423,7 +418,7 @@ def _faster_segments_to_transcript_with_progress(
     flush_words()
 
     if on_progress:
-        on_progress("🎙️ Đang nhận diện giọng nói bằng Whisper 100%")
+        on_progress("Đang nhận diện giọng nói bằng Whisper 100%")
     return Transcript(entries) if entries else None
 
 
@@ -434,10 +429,10 @@ def _transcribe_faster(
     on_progress: ProgressCallback | None = None,
 ) -> Optional[Transcript]:
     if on_progress:
-        on_progress("🎙️ Đang tải model Whisper…")
+        on_progress("Đang tải model Whisper…")
     model = _get_faster_model(cfg)
     if on_progress:
-        on_progress("🎙️ Đang chuẩn bị nhận diện giọng nói bằng Whisper 0%")
+        on_progress("Đang chuẩn bị nhận diện giọng nói bằng Whisper 0%")
     beam_size = int(cfg.get("beam_size") or 5)
     batch_size = int(cfg.get("batch_size") or 1)
     progressive = bool(cfg.get("progressive", True))
@@ -460,7 +455,7 @@ def _transcribe_faster(
         )
     else:
         if batch_size > 1 and on_progress:
-            on_progress("🎙️ Chạy Whisper progressive để cập nhật tiến độ đều hơn 0%")
+            on_progress("Chạy Whisper progressive để cập nhật tiến độ đều hơn 0%")
         segments, _info = model.transcribe(audio_path, **transcribe_kwargs)
     return _faster_segments_to_transcript_with_progress(
         segments,

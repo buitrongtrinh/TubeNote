@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from backend.services.youtube.transcript_whisper import (
     _faster_segments_to_transcript_with_progress,
     _find_balanced_cut,
-    _looks_like_number_continuation,
     _merge_short_ranges,
     _split_into_entries,
 )
@@ -54,21 +53,14 @@ class SplitIntoEntriesTests(unittest.TestCase):
         self.assertAlmostEqual(entries[0].duration, 0.2)
         self.assertEqual(entries[1].start, 0.5)
 
-    def test_long_run_no_punctuation_hard_cuts_at_max_words(self):
+    def test_long_run_without_natural_cut_point_stays_whole(self):
+        """Không còn cắt cứng theo đếm từ: câu dài không có phẩy/liên từ nào
+        được GIỮ NGUYÊN — mảnh câu cụt dịch và đọc TTS đều tệ hơn câu dài
+        trọn vẹn."""
         words = _contiguous_words(10)
         entries = _split_into_entries(words, 6, 0.02)
-        self.assertEqual(len(entries), 2)
-        self.assertEqual(entries[0].text, "w0 w1 w2 w3 w4 w5")
-        self.assertEqual(entries[1].text, "w6 w7 w8 w9")
-
-    def test_hard_cut_avoids_splitting_a_number_fragment(self):
-        words = _contiguous_words(10)
-        words[6]["word"] = ",000"  # simulates "4,000" tokenized as "4" + ",000"
-        entries = _split_into_entries(words, 6, 0.02)
-        self.assertEqual(len(entries), 2)
-        # boundary nudged past the number fragment instead of landing on it
-        self.assertTrue(entries[0].text.endswith(",000"))
-        self.assertNotEqual(entries[1].text[:1], ",")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(len(entries[0].text.split()), 10)
 
     def test_long_run_prefers_balanced_comma_split(self):
         words = _contiguous_words(14)
@@ -80,12 +72,25 @@ class SplitIntoEntriesTests(unittest.TestCase):
         self.assertEqual(entries[1].text, "w5 w6 w7 w8 w9,")
         self.assertEqual(entries[2].text, "w10 w11 w12 w13")
 
-    def test_conjunction_used_as_fallback_split_point(self):
+    def test_conjunction_split_puts_conjunction_at_start_of_second_half(self):
+        """Cắt TRƯỚC liên từ: 'because' mở đầu vế sau thay vì treo lơ lửng
+        cuối vế trước."""
         words = _contiguous_words(10)
         words[5]["word"] = "because"
         entries = _split_into_entries(words, 6, 0.02)
         self.assertEqual(len(entries), 2)
-        self.assertTrue(entries[0].text.endswith("because"))
+        self.assertEqual(entries[0].text, "w0 w1 w2 w3 w4")
+        self.assertTrue(entries[1].text.startswith("because"))
+
+    def test_comma_leftover_without_candidates_stays_whole(self):
+        """Đệ quy cắt mềm: nửa có phẩy được cắt, nửa còn lại dài quá ngưỡng
+        nhưng không còn điểm bấu víu thì giữ nguyên (không cắt cứng)."""
+        words = _contiguous_words(20)
+        words[3]["word"] = "w3,"
+        entries = _split_into_entries(words, 8, 0.02)
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0].text, "w0 w1 w2 w3,")
+        self.assertEqual(len(entries[1].text.split()), 16)
 
     def test_max_words_zero_disables_word_count_splitting(self):
         words = _contiguous_words(30)
@@ -154,16 +159,6 @@ class FindBalancedCutTests(unittest.TestCase):
 
     def test_picks_candidate_closest_to_middle(self):
         self.assertEqual(_find_balanced_cut([2, 5, 8], 0, 10), 5)
-
-
-class NumberContinuationTests(unittest.TestCase):
-    def test_detects_comma_digit_fragment(self):
-        self.assertTrue(_looks_like_number_continuation({"word": ",000"}))
-        self.assertTrue(_looks_like_number_continuation({"word": ".5kg"}))
-
-    def test_ignores_normal_words(self):
-        self.assertFalse(_looks_like_number_continuation({"word": "tokens,"}))
-        self.assertFalse(_looks_like_number_continuation({"word": "4,000"}))
 
 
 class FasterSegmentsToTranscriptTests(unittest.TestCase):
