@@ -50,6 +50,24 @@ class TtsNormalizationTests(unittest.TestCase):
         self.assertEqual(text, "Chạy trừ trừ version để kiểm tra.")
         self.assertEqual(rules, ["cli_flag"])
 
+    def test_single_dash_short_flag_spells_each_letter(self):
+        text, rules = normalize_for_engine("docker ps -a để xem.", "supertonic")
+        self.assertEqual(text, "docker ps trừ ei để xem.")
+        self.assertEqual(rules, ["cli_flag"])
+
+    def test_single_dash_combined_flags_spell_all_letters(self):
+        text, rules = normalize_for_engine("ls -la liệt kê file.", "supertonic")
+        self.assertEqual(text, "ls trừ eo ei liệt kê file.")
+        self.assertEqual(rules, ["cli_flag"])
+
+    def test_single_dash_flag_before_punctuation_still_spoken(self):
+        """Flag đứng ngay trước dấu câu (không có khoảng trắng) vẫn phải được
+        đọc — regression: lookahead (?!\\S) cũ làm rule không khớp trường hợp
+        này, để nguyên "-d." không đọc."""
+        text, rules = normalize_for_engine("thêm cờ -d.", "supertonic")
+        self.assertEqual(text, "thêm cờ trừ đi.")
+        self.assertEqual(rules, ["cli_flag"])
+
     def test_indexed_symbol_reads_letter_and_digit(self):
         text, _ = normalize_for_engine("Ô A1 chứa kết quả.", "supertonic")
         self.assertEqual(text, "Ô a một chứa kết quả.")
@@ -108,8 +126,8 @@ class TtsNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(
             text,
-            "ji pi ti bốn chạy trên ar ti ek bốn không chín không "
-            "với mười sáu gi ga bai vi ar ei em.",
+            "ji pi ti bốn chạy trên a ti ek bốn không chín không "
+            "với mười sáu gi ga bai vi a ei em.",
         )
         self.assertIn("model_code", rules)
         self.assertIn("measurement", rules)
@@ -152,7 +170,7 @@ class TtsNormalizationTests(unittest.TestCase):
             engine="omnivoice",
         )
         self.assertEqual(segments[0]["vi"], "RAG giúp tìm đúng ngữ cảnh.")
-        self.assertEqual(segments[0]["tts"], "ar ei ji giúp tìm đúng ngữ cảnh.")
+        self.assertEqual(segments[0]["tts"], "a ei ji giúp tìm đúng ngữ cảnh.")
         self.assertNotIn("pronunciation_map", segments[0])
 
     def test_builtin_glossary_reads_word_acronyms_as_words(self):

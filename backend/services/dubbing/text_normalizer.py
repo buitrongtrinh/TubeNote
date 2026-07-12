@@ -15,7 +15,7 @@ ALPHABET_PHONETIC = {
     "A": "ei", "B": "bi", "C": "si", "D": "đi", "E": "i",
     "F": "ép", "G": "ji", "H": "ếch", "I": "ai", "J": "jei",
     "K": "kei", "L": "eo", "M": "em", "N": "en", "O": "ou",
-    "P": "pi", "Q": "kiu", "R": "ar", "S": "es", "T": "ti",
+    "P": "pi", "Q": "kiu", "R": "a", "S": "es", "T": "ti",
     "U": "diu", "V": "vi", "W": "đúp liu", "X": "ek", "Y": "wai",
     "Z": "zi",
 }
@@ -270,15 +270,23 @@ def _expand_numbers_and_units(text: str, applied: set[str]) -> str:
 
 
 def _expand_cli_symbols(text: str, applied: set[str]) -> str:
-    """Đọc cờ dòng lệnh dạng --flag thành "trừ trừ flag".
+    """Đọc cờ dòng lệnh: 2 gạch ngang đọc nguyên từ, 1 gạch ngang đánh vần
+    từng chữ (không phải từ thật, vd cờ gộp "-la", "-xzvf").
 
     "chạy --version" → "chạy trừ trừ version".
+    "docker ps -a" → "docker ps trừ ei". "ls -la" → "ls trừ eo ei".
     """
-    def flag(match: re.Match) -> str:
+    def long_flag(match: re.Match) -> str:
         applied.add("cli_flag")
         return f"trừ trừ {match.group(1)}"
 
-    return re.sub(r"(?<!\S)--([A-Za-z][\w-]*)", flag, text)
+    def short_flag(match: re.Match) -> str:
+        applied.add("cli_flag")
+        letters = " ".join(ALPHABET_PHONETIC[c.upper()] for c in match.group(1))
+        return f"trừ {letters}"
+
+    text = re.sub(r"(?<!\S)--([A-Za-z][\w-]*)", long_flag, text)
+    return re.sub(r"(?<!\S)-([A-Za-z]+)", short_flag, text)
 
 
 def _expand_path_tokens(text: str, applied: set[str]) -> str:
