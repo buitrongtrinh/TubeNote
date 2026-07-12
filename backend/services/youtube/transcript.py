@@ -34,17 +34,17 @@ def fetch_transcript(
     video_id = extract_video_id(url)
     cached_path = os.path.join(SUBTITLES_DIR, f"{video_id}.json")
     if os.path.exists(cached_path):
-        progress("📦 Dùng subtitle trong cache")
+        progress("Dùng subtitle trong cache")
         return Transcript.load_from_json(cached_path)
 
-    progress("🔍 Thử lấy manual subtitle (yt-dlp)…")
+    progress("Thử lấy manual subtitle (yt-dlp)…")
     path = _fetch_ytdlp(url=url, languages=languages, output_dir=SUBTITLES_DIR)
     if path is not None:
-        progress("✅ Có manual subtitle — dùng yt-dlp")
+        progress("Có manual subtitle — dùng yt-dlp")
         return Transcript.load_from_json(path)
 
-    progress("⏭️ Không có manual subtitle → fallback Whisper STT")
-    progress("🎙️ Chuẩn bị Whisper STT…")
+    progress("Không có manual subtitle → fallback Whisper STT")
+    progress("Chuẩn bị Whisper STT…")
     path = _fetch_whisper(
         url=url,
         output_dir=SUBTITLES_DIR,
@@ -53,5 +53,5 @@ def fetch_transcript(
     )
     if path is None:
         return None
-    progress("✅ Whisper STT thành công")
+    progress("Whisper STT thành công")
     return Transcript.load_from_json(path)

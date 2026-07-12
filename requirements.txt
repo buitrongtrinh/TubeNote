@@ -33,6 +33,7 @@ langchain-anthropic>=0.3
 
 # YouTube and ASR
 yt-dlp>=2024.8
+secretstorage>=3.3; sys_platform == "linux"  # yt-dlp cần để đọc cookie mã hoá bởi keyring khi dùng YT_COOKIES_BROWSER
 faster-whisper>=1.0
 openai-whisper>=20240930
 
