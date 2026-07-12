@@ -19,14 +19,19 @@ export default function RootLayout({ children }) {
         <header className="topbar">
           <div className="topbar-left">
             <span className="brand-mark" aria-hidden="true">
+              {/* Waveform — giọng nói là sản phẩm; bar nhấp nhô khi hover (CSS) */}
               <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8.2 5.4v13.2c0 .8.9 1.3 1.6.9l10.4-6.6c.6-.4.6-1.4 0-1.8L9.8 4.5c-.7-.4-1.6.1-1.6.9Z" />
+                <rect x="2.5" y="8.5" width="3" height="7" rx="1.5" />
+                <rect x="8" y="5" width="3" height="14" rx="1.5" />
+                <rect x="13.5" y="2.5" width="3" height="19" rx="1.5" />
+                <rect x="19" y="7" width="3" height="10" rx="1.5" />
               </svg>
             </span>
             <span className="brand">TuBeNote</span>
+            <NavLinks />
           </div>
           <div className="topbar-actions">
-            <NavLinks />
+            <NavLinks variant="create" />
             <ThemeToggle />
           </div>
         </header>

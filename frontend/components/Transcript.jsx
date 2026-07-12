@@ -40,6 +40,8 @@ export default function Transcript({ segments, time, onSeek, onRegenerate, regen
     body.scrollBy({ top: offset, behavior: "smooth" });
   }, [activeIdx]);
 
+  const canRegenerateAny = segments.some((seg) => seg.can_regenerate);
+
   return (
     <div className="transcript">
       <div className="transcript-head">
@@ -49,6 +51,13 @@ export default function Transcript({ segments, time, onSeek, onRegenerate, regen
         <label><input type="checkbox" checked={show.vi}
           onChange={(e) => setShow((s) => ({ ...s, vi: e.target.checked }))} /> Dịch</label>
       </div>
+      {/* Nút "Tạo lại" từng câu chỉ hiện khi trỏ vào dòng — dòng hint này là
+          chỗ người dùng MỚI biết tính năng tồn tại, nên luôn hiển thị. */}
+      {canRegenerateAny && (
+        <div className="transcript-hint">
+          Di chuột vào một câu để <b>Tạo lại</b> giọng đọc của riêng câu đó.
+        </div>
+      )}
       <div className="transcript-body" ref={bodyRef}>
         {segments.map((seg, i) => (
           <div

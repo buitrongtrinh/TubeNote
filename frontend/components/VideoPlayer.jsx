@@ -58,7 +58,15 @@ const PLAYER_TRANSLATIONS = {
   Volume: "Âm lượng",
 };
 
-export default function VideoPlayer({ src, title, poster, playerRef, onTime, subtitles }) {
+export default function VideoPlayer({
+  src,
+  title,
+  poster,
+  playerRef,
+  onTime,
+  subtitles,
+  chapters,
+}) {
   return (
     <MediaPlayer
       ref={playerRef}
@@ -86,6 +94,15 @@ export default function VideoPlayer({ src, title, poster, playerRef, onTime, sub
             kind="subtitles"
             label="English"
             lang="en"
+          />
+        )}
+        {chapters && (
+          <Track
+            src={chapters}
+            kind="chapters"
+            label="Phân cảnh"
+            lang="vi"
+            default
           />
         )}
       </MediaProvider>

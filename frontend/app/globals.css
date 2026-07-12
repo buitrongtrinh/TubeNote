@@ -1,38 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ── Design tokens ─────────────────────────────────────────────────────────
-   Mọi màu trong file này đi qua token để light/dark cùng 1 bộ selector.
-   Theme do <html data-theme="light|dark"> quyết định (script trong layout).  */
+   Hướng thiết kế "phòng thu lồng tiếng": bề mặt trung tính ám ấm (giấy/mực),
+   MỘT màu tín hiệu cam hổ phách kiểu đèn on-air / kim VU-meter. Sans là
+   Be Vietnam Pro (thiết kế cho tiếng Việt); JetBrains Mono là "giọng console"
+   cho timecode, nhãn kênh, số liệu. Mọi màu đi qua token để light/dark dùng
+   chung một bộ selector — theme do <html data-theme="light|dark"> quyết định. */
 :root {
-  --bg: #f6f6f8;
+  --bg: #f7f6f4;
   --surface: #ffffff;
-  --surface-2: #f0f0f3;
-  --surface-3: #e5e5ea;
-  --text: #101014;
-  --text-dim: #40404a;
-  --muted: #6d6d78;
-  --border: #e7e7ec;
-  --border-strong: #d2d2db;
-  --accent: #dc2033;
-  --accent-hover: #b8172a;
-  --accent-soft: rgba(220, 32, 51, 0.09);
-  --ok: #0a7d4f;
-  --warn: #b45309;
-  --fail: #c81e1e;
-  --fail-soft: #fdf1f1;
-  --fail-strong: #8a1616;
-  --solid-bg: #101014;
-  --solid-text: #ffffff;
-  --solid-hover: #2c2c34;
-  --focus: #2563eb;
-  --topbar-bg: rgba(255, 255, 255, 0.82);
-  --scroll-thumb: #c8c8d2;
-  --scroll-thumb-hover: #a3a3af;
-  --shadow-sm: 0 1px 2px rgba(16, 16, 20, 0.06), 0 1px 6px rgba(16, 16, 20, 0.05);
-  --shadow-md: 0 6px 22px rgba(16, 16, 20, 0.12);
-  --shadow-lg: 0 18px 50px rgba(16, 16, 20, 0.22);
+  --surface-2: #f1f0ed;
+  --surface-3: #e8e6e1;
+  --text: #1b1916;
+  --text-dim: #47443f;
+  --muted: #6e6a63;
+  --border: #e6e4df;
+  --border-strong: #d2cfc7;
+  --accent: #e45304;
+  --accent-hover: #c64803;
+  --accent-soft: rgba(228, 83, 4, 0.1);
+  /* Nền cam cho mảng phủ có chữ: đậm hơn --accent một chút để chữ TRẮNG đủ
+     tương phản (cam + chữ đen nhìn như biển cảnh báo — tránh). */
+  --accent-fill: #d94e04;
+  --accent-fill-hover: #bc4203;
+  --on-accent: #ffffff;
+  --ok: #147a44;
+  --warn: #9a6700;
+  --fail: #c92a2a;
+  --fail-soft: #fceeee;
+  --fail-strong: #8c1f1f;
+  --solid-bg: #1b1916;
+  --solid-text: #fcfbf9;
+  --solid-hover: #35322c;
+  --focus: #e45304;
+  --topbar-bg: rgba(247, 246, 244, 0.85);
+  --scroll-thumb: #cfccc5;
+  --scroll-thumb-hover: #aba79e;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236e6a63' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  --shadow-sm: 0 1px 2px rgba(27, 25, 22, 0.06), 0 1px 6px rgba(27, 25, 22, 0.05);
+  --shadow-md: 0 6px 22px rgba(27, 25, 22, 0.13);
+  --shadow-lg: 0 18px 50px rgba(27, 25, 22, 0.22);
   --radius-sm: 8px;
   --radius: 10px;
   --radius-lg: 14px;
@@ -40,30 +49,36 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #0e0e11;
-  --surface: #17171c;
-  --surface-2: #1f1f26;
-  --surface-3: #2a2a34;
-  --text: #f1f1f4;
-  --text-dim: #c6c6cf;
-  --muted: #93939f;
-  --border: #26262e;
-  --border-strong: #3b3b46;
-  --accent: #f4465a;
-  --accent-hover: #ff6577;
-  --accent-soft: rgba(244, 70, 90, 0.15);
-  --ok: #3ecf8e;
-  --warn: #e5a13d;
-  --fail: #ff6369;
-  --fail-soft: rgba(255, 99, 105, 0.12);
-  --fail-strong: #ffb3b6;
-  --solid-bg: #f1f1f4;
-  --solid-text: #131318;
-  --solid-hover: #d7d7de;
-  --focus: #60a5fa;
-  --topbar-bg: rgba(14, 14, 17, 0.78);
-  --scroll-thumb: #3b3b46;
-  --scroll-thumb-hover: #56565f;
+  --bg: #131211;
+  --surface: #1b1a18;
+  --surface-2: #242220;
+  --surface-3: #2f2c29;
+  --text: #f1efea;
+  --text-dim: #ccc8c0;
+  --muted: #98938b;
+  --border: #2c2a26;
+  --border-strong: #45413b;
+  --accent: #ff8534;
+  --accent-hover: #ffa05c;
+  --accent-soft: rgba(255, 133, 52, 0.14);
+  /* Dark: --accent sáng để nét/chữ nổi trên nền tối, nhưng mảng phủ có chữ
+     trắng cần cam trầm hơn — tách riêng fill. */
+  --accent-fill: #e05305;
+  --accent-fill-hover: #c74904;
+  --on-accent: #ffffff;
+  --ok: #3dd68c;
+  --warn: #e3b341;
+  --fail: #ff6b6b;
+  --fail-soft: rgba(255, 107, 107, 0.13);
+  --fail-strong: #ffc0c0;
+  --solid-bg: #f1efea;
+  --solid-text: #171512;
+  --solid-hover: #d6d2ca;
+  --focus: #ff8534;
+  --topbar-bg: rgba(19, 18, 17, 0.8);
+  --scroll-thumb: #3e3a34;
+  --scroll-thumb-hover: #57524a;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398938b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 26px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.65);
@@ -73,16 +88,19 @@ html { scroll-behavior: smooth; }
 
 body {
   min-height: 100vh;
-  background: var(--bg);
+  /* Quầng sáng cam rất nhẹ phía trên — hơi ấm "đèn phòng thu", không phải décor */
+  background:
+    radial-gradient(1100px 380px at 50% -120px, color-mix(in srgb, var(--accent) 5%, transparent), transparent 70%),
+    var(--bg);
   color: var(--text);
-  font-family: 'Inter', Arial, sans-serif;
+  font-family: 'Be Vietnam Pro', 'Segoe UI', Arial, sans-serif;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 a { color: inherit; text-decoration: none; }
-button, input, textarea, select { font: inherit; }
+button, input, textarea, select { font: inherit; text-transform: none; }
 ::selection { background: var(--accent-soft); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -101,6 +119,29 @@ textarea:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* Nhãn console — giọng mono thống nhất cho mọi label/eyebrow trong app.
+   (form control đã reset text-transform nên uppercase ở container an toàn) */
+.tts-panel-head span,
+.tts-select span,
+.rag-header-title span,
+.rag-model-field span,
+.rag-summary-title,
+.rag-sources-title,
+.tts-text-row label,
+.raw-content-block label,
+.regen-field,
+.regen-tts-preview-body span,
+.dubbing-info-row span,
+.dubbing-info-head span,
+.pronunciation-map-head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .topbar {
@@ -138,63 +179,112 @@ summary:focus-visible {
 .topbar-left { gap: 10px; min-width: 0; }
 .topbar-actions { justify-content: flex-end; gap: 10px; min-width: 0; }
 
+/* Brand mark: waveform — giọng nói là sản phẩm. Bar nhấp nhô khi hover. */
 .brand-mark {
-  width: 34px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.72rem;
-  line-height: 1;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 9px;
+  background: linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent-fill) 82%, #7c2d05));
+  color: var(--on-accent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-.brand-mark svg { width: 13px; height: 13px; display: block; }
+.brand-mark svg { width: 16px; height: 16px; display: block; }
+.brand-mark svg rect { transform-origin: center; transform-box: fill-box; }
+
+.topbar-left:hover .brand-mark rect { animation: eq-bar 0.9s ease-in-out infinite; }
+.topbar-left:hover .brand-mark rect:nth-child(2) { animation-delay: 0.12s; }
+.topbar-left:hover .brand-mark rect:nth-child(3) { animation-delay: 0.24s; }
+.topbar-left:hover .brand-mark rect:nth-child(4) { animation-delay: 0.36s; }
 
 .brand {
   font-weight: 800;
-  font-size: 1.12rem;
+  font-size: 1.1rem;
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
+/* Hệ nút: nút hành động vuông-mềm (công cụ); pill chỉ dành cho nav/chip/badge */
 .nav-actions { gap: 6px; }
 .nav-actions a,
 .action-row button,
 .chip,
 button {
-  border: 0;
-  border-radius: 999px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
-  padding: 9px 15px;
-  font-size: 0.9rem;
+  padding: 8px 14px;
+  font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s, color .15s, opacity .15s, box-shadow .15s, transform .06s;
+  transition: background .15s, color .15s, border-color .15s, opacity .15s, box-shadow .15s, transform .06s;
   white-space: nowrap;
 }
 
 button:active:not(:disabled) { transform: scale(0.98); }
 
-.nav-actions a { background: transparent; color: var(--text-dim); }
+.nav-actions a {
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+}
 
 .nav-actions a:hover,
 .action-row button:hover,
 .chip:hover,
 button:hover:not(:disabled) { background: var(--surface-3); }
 
-.nav-actions a.active,
 .primary {
-  background: var(--solid-bg);
-  color: var(--solid-text);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  border-color: transparent;
 }
 
-.primary:hover:not(:disabled),
+.primary:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+}
+
+/* Tab "đang ở đây" — nền cam nhạt, nhường cam đặc cho CTA tạo mới bên phải */
+.nav-actions a.active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
 .nav-actions a.active:hover {
-  background: var(--solid-hover);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Dark: tint cam nhạt trên nền tối bị ngả nâu, mất sắc cam — truyền hue qua
+   CHỮ cam sáng thay vì nền; tint mờ phía sau thành quầng "than hồng". */
+:root[data-theme="dark"] .nav-actions a.active {
+  color: var(--accent-hover);
+}
+
+/* CTA tạo mới — hành động, không phải nơi chốn; cam thường trực bên phải */
+.create-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background .15s, box-shadow .15s;
+}
+
+.create-cta:hover { background: var(--accent-fill-hover); }
+.create-cta span { font-weight: 600; }
+
+/* Đang đứng ngay trang tạo -> vòng nhấn "you are here" quanh CTA */
+.create-cta.active {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 button:disabled {
@@ -233,16 +323,16 @@ button:disabled {
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
-.feed-header.compact { align-items: flex-start; margin-bottom: 18px; }
+.feed-header.compact { align-items: flex-start; margin-bottom: 20px; }
 
 h1 {
-  font-size: 1.7rem;
+  font-size: 1.65rem;
   line-height: 1.2;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .feed-header p,
@@ -254,7 +344,13 @@ h1 {
   font-size: 0.88rem;
 }
 
-.feed-header p { margin-top: 4px; }
+/* Dòng đếm dưới tiêu đề = dữ liệu -> giọng mono console */
+.feed-header p {
+  margin-top: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
 
 .video-grid {
   display: grid;
@@ -262,12 +358,34 @@ h1 {
   gap: 30px 20px;
 }
 
+/* Card hiện dần theo lượt khi vào trang — một khoảnh khắc mở màn duy nhất,
+   ngắn (0.3s), không lặp lại. Chỉ stagger 8 card đầu, còn lại hiện cùng lượt
+   cuối để danh sách dài không phải chờ. */
+.video-grid > * {
+  animation: card-in .3s ease backwards;
+}
+
+.video-grid > *:nth-child(1) { animation-delay: .03s; }
+.video-grid > *:nth-child(2) { animation-delay: .07s; }
+.video-grid > *:nth-child(3) { animation-delay: .11s; }
+.video-grid > *:nth-child(4) { animation-delay: .15s; }
+.video-grid > *:nth-child(5) { animation-delay: .19s; }
+.video-grid > *:nth-child(6) { animation-delay: .23s; }
+.video-grid > *:nth-child(7) { animation-delay: .27s; }
+.video-grid > *:nth-child(n+8) { animation-delay: .31s; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
 .draft-thumb-placeholder {
   width: 100%;
   height: 100%;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.82);
+  background: linear-gradient(145deg, #26221d, #3d372f);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 1.2rem;
   font-weight: 800;
 }
@@ -278,11 +396,13 @@ h1 {
   bottom: 8px;
   padding: 4px 8px;
   border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .video-card {
@@ -309,7 +429,7 @@ h1 {
   z-index: 2;
   padding: 6px 11px;
   border-radius: 999px;
-  background: rgba(12, 12, 14, 0.72);
+  background: rgba(15, 13, 11, 0.72);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   color: #fff;
@@ -329,7 +449,7 @@ h1 {
 }
 
 .video-delete-button:hover:not(:disabled) {
-  background: var(--accent);
+  background: var(--fail);
 }
 
 @media (hover: none) {
@@ -342,8 +462,11 @@ h1 {
   overflow: hidden;
   background: var(--surface-3);
   border-radius: var(--radius-lg);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent) inset;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent) inset;
+  transition: box-shadow .2s ease;
 }
+
+.video-card:hover .thumb-wrap { box-shadow: var(--shadow-md); }
 
 .thumb-wrap img {
   width: 100%;
@@ -360,11 +483,11 @@ h1 {
   right: 8px;
   bottom: 8px;
   padding: 3px 6px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgba(0, 0, 0, 0.82);
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
@@ -375,17 +498,28 @@ h1 {
   padding-top: 12px;
 }
 
+.video-card-text { min-width: 0; }
+
 .channel-avatar {
   width: 38px;
   height: 38px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
-  color: #fff;
+  overflow: hidden;
+  background: var(--surface-3);
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 800;
   flex: 0 0 auto;
+}
+
+.channel-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .channel-avatar.large {
@@ -424,14 +558,15 @@ h1 {
 .empty-state.compact { min-height: 180px; }
 .empty-state h2 { color: var(--text); font-size: 1.25rem; letter-spacing: -0.01em; }
 .empty-icon {
-  width: 60px;
+  width: 58px;
   height: 44px;
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1rem;
 }
 
 .create-layout {
@@ -476,21 +611,33 @@ textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
-  padding: 11px 13px;
+  padding: 10px 13px;
   outline: none;
   transition: border-color .15s, box-shadow .15s;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 15px;
 }
 
 input[type="text"]:focus,
 input[type="number"]:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
+
+input[type="checkbox"] { accent-color: var(--accent); }
 
 textarea {
   min-height: 280px;
@@ -504,6 +651,12 @@ textarea {
   margin-top: 12px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.stage.stage-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .tag-ok { color: var(--ok); font-size: 0.82rem; font-weight: 700; }
@@ -541,14 +694,36 @@ textarea {
 .section-head h2 {
   font-size: 1.1rem;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .provider-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
+  margin-top: 10px;
+}
+
+/* Nút mở tab dịch ngoài (ChatGPT) — hành động phụ đi kèm câu hướng dẫn */
+.provider-open {
+  min-height: 34px;
+  padding: 7px 13px;
+  border-color: var(--border-strong);
+  background: var(--surface);
+  font-size: 0.84rem;
+}
+
+.provider-open span {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 0.9em;
+  transition: color .15s, transform .15s;
+}
+
+.provider-open:hover:not(:disabled) span {
+  color: var(--accent);
+  transform: translate(1px, -1px);
 }
 
 .translation-tools {
@@ -575,7 +750,7 @@ textarea {
 
 .translation-api-controls select {
   height: 38px;
-  padding: 8px 10px;
+  padding: 8px 32px 8px 10px;
   font-size: 0.84rem;
 }
 
@@ -592,6 +767,7 @@ textarea {
   padding: 12px;
 }
 
+/* Số thứ tự prompt = dữ liệu tuần tự thật -> mono */
 .prompt-no {
   width: 28px;
   height: 28px;
@@ -599,9 +775,30 @@ textarea {
   place-items: center;
   border-radius: 50%;
   background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border) inset;
   color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.chapter-prompt-heading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 4px 0 0;
+}
+
+.chapter-prompt-heading strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.chapter-prompt-heading span {
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
 }
 
 .prompt-main,
@@ -609,6 +806,7 @@ textarea {
 .prompt-end { justify-content: flex-end; }
 .chip {
   min-height: 36px;
+  border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid transparent;
 }
@@ -694,6 +892,19 @@ textarea {
 
 .publish-bar > button { width: 100%; }
 
+/* Nút REC — CTA quan trọng nhất của app: phủ cam on-air, chữ trắng */
+.publish-bar .primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.publish-bar .primary:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+}
+
 .prompt-workflow {
   display: flex;
   flex-direction: column;
@@ -712,6 +923,15 @@ textarea {
 .prompt-workflow .publish-bar > button {
   order: 4;
   margin-top: 18px;
+  /* Dính đáy viewport khi cuộn danh sách prompt dài — không phải cuộn tới
+     tận cùng trang mới bấm được. Vòng halo màu nền tách nút khỏi nội dung
+     đang trôi phía dưới. */
+  position: sticky;
+  bottom: 14px;
+  z-index: 5;
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--bg) 82%, transparent),
+    0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .prompt-workflow .publish-bar > .background-toggle {
@@ -723,7 +943,8 @@ textarea {
   margin-top: 10px;
 }
 
-.prompt-workflow .publish-bar > .dub-progress { order: 5; }
+.prompt-workflow .publish-bar > .dub-progress,
+.prompt-workflow .publish-bar > .dub-stage-wait { order: 5; }
 
 .tts-panel {
   display: grid;
@@ -745,15 +966,8 @@ textarea {
 
 .tts-panel-head div {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-}
-
-.tts-panel-head span,
-.tts-select span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .tts-panel-head strong {
@@ -774,6 +988,86 @@ textarea {
   line-height: 1.35;
   text-align: right;
 }
+
+/* Khối cấu hình phần cứng gập được — mặc định chỉ là 1 dòng tóm tắt */
+.hw-config {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.hw-config[open] { background: var(--surface); }
+
+.hw-config > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: inherit;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.hw-config > summary::-webkit-details-marker { display: none; }
+.hw-config:not([open]) > summary:hover { background: var(--surface-3); }
+
+.hw-config-caret {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.7rem;
+  transition: transform .15s ease;
+}
+
+.hw-config[open] .hw-config-caret { transform: rotate(90deg); }
+
+.hw-config-label {
+  flex: 0 0 auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hw-config > summary > b {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hw-config-end {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hw-config-dirty {
+  color: var(--warn);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.hw-config-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.hw-config > summary:hover .hw-config-hint { color: var(--text); }
+
+.hw-config-body { padding: 0 12px 12px; }
 
 .load-options {
   display: grid;
@@ -796,9 +1090,8 @@ textarea {
   grid-template-columns: minmax(90px, 120px) minmax(110px, 140px) minmax(220px, 1fr) auto;
 }
 
-.load-options.tts-engine-options {
-  grid-template-columns: minmax(220px, 320px) minmax(110px, 140px) minmax(220px, 1fr);
-}
+/* .tts-engine-options từng có cột giữa cho dropdown batch-size (đã bỏ) —
+   giờ dùng lưới 2 cột mặc định của .load-options, không cần override. */
 
 .hw-actions {
   display: flex;
@@ -814,22 +1107,32 @@ textarea {
 
 .hw-recommend {
   margin-top: 10px;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--muted);
   font-size: 0.84rem;
 }
 
+.hw-recommend p {
+  margin: 0;
+}
+
+.hw-recommend p + p {
+  margin-top: 4px;
+}
+
 .hw-recommend b { color: var(--text); font-weight: 700; }
 
 .hw-recommend.pending {
   border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-left-color: var(--warn);
   background: color-mix(in srgb, var(--warn) 8%, var(--surface-2));
 }
 
-.hw-recommend span {
+.hw-recommend .hw-dirty-hint {
   color: var(--warn);
   font-weight: 700;
 }
@@ -914,8 +1217,10 @@ textarea {
 
 .tts-text-row > span {
   color: var(--muted);
-  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
   text-align: right;
+  padding-top: 2px;
 }
 
 .tts-text-row p,
@@ -925,14 +1230,6 @@ textarea {
   display: block;
   margin: 0;
   overflow-wrap: anywhere;
-}
-
-.tts-text-row label,
-.raw-content-block label {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
 }
 
 .tts-text-row p {
@@ -988,6 +1285,30 @@ textarea {
 }
 
 .dub-progress { margin-top: 12px; }
+
+.dub-progress > .stage {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* Loader waveform nằm cạnh chữ stage trong hàng label của thanh tiến độ */
+.dub-progress-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Pha không có tiến độ chi tiết (load model, Demucs, trộn video): chữ +
+   loader waveform thay vì thanh % giả đứng hình. */
+.dub-stage-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
 .dub-progress-bar {
   height: 6px;
   overflow: hidden;
@@ -997,48 +1318,94 @@ textarea {
 .dub-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #ff9a3d));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 82%, #7c2d05), var(--accent));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
   transition: width .35s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Vệt sáng chạy trên thanh tiến độ: CHỨC NĂNG, không phải trang trí — TTS có
+   những đoạn % đứng yên hàng chục giây (câu dài), vệt sáng cho biết hệ thống
+   vẫn đang chạy chứ không treo. */
+.dub-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: progress-sheen 1.6s linear infinite;
+}
+
+@keyframes progress-sheen {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
 }
 .dub-progress-label {
   justify-content: space-between;
   margin-top: 7px;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
 }
 
+.dub-progress-label.progress-percent-only { justify-content: flex-end; }
+
+/* Thanh bước bên trái — checklist phiên thu, số mono nối bằng rãnh dọc */
 .create-steps {
   position: sticky;
   top: calc(var(--topbar-h) + 22px);
   display: grid;
-  gap: 14px;
+  gap: 0;
   align-self: start;
   padding: 16px;
 }
 
 .step {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   gap: 10px;
+  position: relative;
+  padding-bottom: 18px;
 }
 
+.step:last-child { padding-bottom: 0; }
+
+.step::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--border);
+}
+
+.step:last-child::before { display: none; }
+
 .step span {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--surface-2);
   color: var(--muted);
-  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
   box-shadow: 0 0 0 1px var(--border) inset;
+  position: relative;
+  z-index: 1;
 }
 
 .step.done span {
-  background: var(--solid-bg);
-  color: var(--solid-text);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   box-shadow: none;
 }
+
+.step.done::before { background: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 
 .step b { display: block; font-size: 0.92rem; }
 
@@ -1049,9 +1416,10 @@ textarea {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(6, 6, 10, 0.55);
+  background: rgba(10, 9, 7, 0.55);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
+  animation: overlay-in .15s ease;
 }
 
 .modal {
@@ -1063,6 +1431,16 @@ textarea {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   padding: 18px;
+  /* Vào nhẹ từ dưới — định hướng không gian (modal "mọc" từ trang), 0.18s */
+  animation: modal-in .18s ease;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
 }
 
 .modal-head,
@@ -1150,12 +1528,6 @@ textarea {
   font-size: 1rem;
 }
 
-.dubbing-info-head span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
 .dubbing-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1168,12 +1540,6 @@ textarea {
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
-}
-
-.dubbing-info-row span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
 }
 
 .dubbing-info-row strong {
@@ -1202,12 +1568,30 @@ textarea {
 .transcript {
   height: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 0;
   border-radius: 0;
   background: var(--surface);
+}
+
+/* Dòng dạy tính năng "Tạo lại" (nút chỉ hiện khi hover nên cần chỗ nói ra) */
+.transcript-hint {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.transcript-hint b { color: var(--text); font-weight: 700; }
+
+/* Máy cảm ứng: nút luôn hiện sẵn -> hint "di chuột" vô nghĩa, ẩn đi */
+@media (hover: none) {
+  .transcript-hint { display: none; }
 }
 
 .side-tabs {
@@ -1267,6 +1651,7 @@ textarea {
 .transcript-head input { accent-color: var(--accent); }
 
 .transcript-body {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 4px 0;
@@ -1294,14 +1679,7 @@ textarea {
 .rag-header-title {
   min-width: 0;
   display: grid;
-  gap: 2px;
-}
-
-.rag-header-title span,
-.rag-model-field span {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
+  gap: 3px;
 }
 
 .rag-header-title strong {
@@ -1333,8 +1711,8 @@ textarea {
   height: 34px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 0 9px;
-  background: var(--surface-2);
+  padding: 0 28px 0 9px;
+  background-color: var(--surface-2);
   color: var(--text);
   font-size: 0.8rem;
   font-weight: 700;
@@ -1347,14 +1725,14 @@ textarea {
 .rag-model-action {
   min-height: 34px;
   border-radius: var(--radius-sm);
-  background: var(--solid-bg);
-  color: var(--solid-text);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   padding: 0 12px;
   white-space: nowrap;
 }
 
 .rag-model-action:hover:not(:disabled) {
-  background: var(--solid-hover);
+  background: var(--accent-fill-hover);
 }
 
 .rag-thread {
@@ -1383,8 +1761,9 @@ textarea {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: var(--surface-3);
-  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 800;
 }
 
@@ -1414,9 +1793,6 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
 }
 
 .rag-summary-title em {
@@ -1427,11 +1803,16 @@ textarea {
   white-space: nowrap;
 }
 
-.rag-summary-card p {
+.rag-summary-card p,
+.rag-summary-card ul {
   color: var(--text);
   font-size: 0.88rem;
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+
+.rag-summary-card p + p,
+.rag-summary-card ul {
+  margin-top: 4px;
 }
 
 .rag-summary-loading {
@@ -1440,17 +1821,9 @@ textarea {
   gap: 8px;
   width: fit-content;
   border-radius: 999px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   background: var(--surface-2);
   box-shadow: var(--shadow-sm);
-}
-
-.rag-summary-loading span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  animation: rag-pulse 1s infinite ease-in-out;
 }
 
 .rag-summary-loading p {
@@ -1474,15 +1847,16 @@ textarea {
   color: var(--text);
 }
 
-.rag-sources-title {
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
 .rag-question p,
-.rag-answer p {
+.rag-answer p,
+.rag-answer ul {
   font-size: 0.9rem;
   line-height: 1.48;
+}
+
+.rag-answer p + p,
+.rag-answer ul {
+  margin-top: 4px;
 }
 
 .rag-answer {
@@ -1492,17 +1866,39 @@ textarea {
   padding: 2px 2px 2px 0;
   background: transparent;
   color: var(--text);
-  white-space: pre-wrap;
+}
+
+.rag-summary-card ul,
+.rag-answer ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rag-summary-card li,
+.rag-answer li {
+  margin-bottom: 2px;
+}
+
+.rag-summary-card strong,
+.rag-answer strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rag-summary-card code,
+.rag-answer code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 
 .rag-sources {
   display: grid;
   gap: 7px;
   padding-left: 0;
-}
-
-.rag-sources-title {
-  color: var(--muted);
 }
 
 .rag-source {
@@ -1531,8 +1927,8 @@ textarea {
   color: var(--solid-text) !important;
   padding: 3px 7px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .rag-source small {
@@ -1552,29 +1948,83 @@ textarea {
   gap: 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   background: var(--surface-2);
   color: var(--muted);
   font-size: 0.88rem;
   box-shadow: var(--shadow-sm);
 }
 
-.rag-loading span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  animation: rag-pulse 1s infinite ease-in-out;
+/* Chỉ báo đang xử lý = waveform 3 vạch (chữ ký của app), không phải chấm tròn.
+   1 span -> vạch giữa vẽ bằng background, 2 vạch biên là pseudo-element. */
+.rag-loading span,
+.rag-summary-loading span,
+.eq-loader {
+  position: relative;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  background: linear-gradient(var(--accent) 0 0) center / 3px 45% no-repeat;
+  animation: eq-mid 1s ease-in-out infinite;
 }
 
+.rag-loading span::before,
+.rag-loading span::after,
+.rag-summary-loading span::before,
+.rag-summary-loading span::after,
+.eq-loader::before,
+.eq-loader::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform-origin: center;
+  animation: eq-bar 1s ease-in-out infinite;
+}
+
+.rag-loading span::before,
+.rag-summary-loading span::before,
+.eq-loader::before { left: 0; animation-delay: 0.15s; }
+.rag-loading span::after,
+.rag-summary-loading span::after,
+.eq-loader::after { right: 0; animation-delay: 0.3s; }
+
 .rag-error { white-space: pre-wrap; }
+
+.rag-web-mode {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.rag-web-mode button {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.rag-web-mode button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
 
 .rag-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   padding: 12px;
-  border-top: 1px solid var(--border);
+  border-top: none;
   background: var(--surface);
 }
 
@@ -1592,26 +2042,31 @@ textarea {
 }
 
 .rag-input-row textarea:focus {
-  border-color: var(--focus);
+  border-color: var(--accent);
   background: var(--surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .rag-input-row button {
   align-self: end;
   min-height: 42px;
   border-radius: var(--radius-sm);
-  background: var(--solid-bg);
-  color: var(--solid-text);
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .rag-input-row button:hover:not(:disabled) {
-  background: var(--solid-hover);
+  background: var(--accent-fill-hover);
 }
 
-@keyframes rag-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes eq-mid {
+  0%, 100% { background-size: 3px 45%; }
+  50% { background-size: 3px 100%; }
 }
 
 .tline {
@@ -1621,7 +2076,10 @@ textarea {
   padding: 9px 14px;
   cursor: pointer;
   border-left: 3px solid transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
+
+.tline:last-child { border-bottom: none; }
 
 .tline.has-action { grid-template-columns: 52px minmax(0, 1fr) auto; }
 
@@ -1630,6 +2088,20 @@ textarea {
   padding: 6px 10px;
   font-size: 0.78rem;
   white-space: nowrap;
+  /* 75 dòng phụ đề x 1 nút lặp lại = nhiễu thị giác; chỉ hiện ở dòng đang
+     trỏ tới (hover/focus). Máy cảm ứng không có hover -> luôn hiện. */
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+.tline:hover .tline-regenerate,
+.tline:focus-within .tline-regenerate,
+.tline.active .tline-regenerate {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tline-regenerate { opacity: 1; }
 }
 
 .tline:hover { background: var(--surface-2); }
@@ -1644,6 +2116,8 @@ textarea {
   font-size: 0.74rem;
   padding-top: 2px;
 }
+
+.tline.active .tline-time { color: var(--accent); font-weight: 600; }
 
 .tline-text {
   display: grid;
@@ -1667,9 +2141,6 @@ textarea {
 .regen-field {
   display: grid;
   gap: 7px;
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 700;
 }
 
 .regen-field + .regen-field { margin-top: 14px; }
@@ -1682,9 +2153,10 @@ textarea {
 .regen-field textarea,
 .regen-field select,
 .pronunciation-map-row input {
-  font-family: 'Inter', Arial, sans-serif;
+  font-family: 'Be Vietnam Pro', 'Segoe UI', Arial, sans-serif;
   font-size: 0.9rem;
   font-weight: 400;
+  letter-spacing: normal;
 }
 
 .pronunciation-map-head,
@@ -1692,11 +2164,6 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
   gap: 8px;
-}
-
-.pronunciation-map-head {
-  color: var(--muted);
-  font-size: 0.75rem;
 }
 
 .pronunciation-map-rows { display: grid; gap: 8px; }
@@ -1742,19 +2209,15 @@ textarea {
   gap: 4px;
 }
 
-.regen-tts-preview-body span {
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-
 .regen-tts-preview-body p,
 .regen-tts-preview-body code {
   margin: 0;
   color: var(--text);
-  font-family: inherit;
+  font-family: 'Be Vietnam Pro', 'Segoe UI', Arial, sans-serif;
   font-size: 0.9rem;
   font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
   line-height: 1.45;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -1991,9 +2454,11 @@ media-player .vds-time-slider .vds-slider-chapter {
 }
 
 @media (max-width: 620px) {
-  .topbar { padding: 0 10px; }
+  .topbar { padding: 0 10px; gap: 8px; }
   .brand { font-size: 1rem; }
+  .topbar-left { gap: 6px; }
   .nav-actions a { padding: 8px 10px; font-size: 0.84rem; }
+  .create-cta { padding: 8px 12px; font-size: 0.84rem; }
   .feed-header,
   .watch-meta-row,
   .section-head {

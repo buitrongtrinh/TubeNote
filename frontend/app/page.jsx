@@ -58,7 +58,12 @@ export default function LibraryPage() {
       </div>
 
       {err && <div className="tag-fail">{err}</div>}
-      {items === null && !err && <div className="empty-state">Đang tải video…</div>}
+      {items === null && !err && (
+        <div className="empty-state">
+          <span className="eq-loader" aria-hidden="true" />
+          Đang tải video…
+        </div>
+      )}
 
       {items && items.length === 0 && (
         <div className="empty-state">
@@ -81,7 +86,11 @@ export default function LibraryPage() {
                     {dur && <div className="thumb-dur">{dur}</div>}
                   </div>
                   <div className="video-card-body">
-                    <div className="channel-avatar">{it.channel?.slice(0, 1)?.toUpperCase() || "T"}</div>
+                    <div className="channel-avatar">
+                      {it.channel_avatar
+                        ? <img src={it.channel_avatar} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                        : (it.channel?.slice(0, 1)?.toUpperCase() || "T")}
+                    </div>
                     <div className="video-card-text">
                       <div className="video-title">{it.title}</div>
                       <div className="video-meta">{it.channel}</div>

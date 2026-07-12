@@ -2,9 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 import { api } from "@/lib/api";
 import Transcript from "@/components/Transcript";
 import VideoPlayer from "@/components/VideoPlayer";
+
+// Prompt yêu cầu LLM chỉ dùng bold/list, không heading/bảng/code-fence (panel
+// chat hẹp, dễ vỡ layout) — chặn thêm ở đây phòng khi model không tuân thủ.
+const RAG_MARKDOWN_DISALLOWED = ["h1", "h2", "h3", "h4", "h5", "h6", "table", "pre", "img"];
+
+function RagMarkdown({ text }) {
+  return (
+    <ReactMarkdown disallowedElements={RAG_MARKDOWN_DISALLOWED} unwrapDisallowed>
+      {text}
+    </ReactMarkdown>
+  );
+}
 
 function fmtCount(n) {
   if (typeof n !== "number") return null;
@@ -177,6 +190,12 @@ const FALLBACK_RAG_MODELS = {
   ],
 };
 
+const RAG_WEB_MODES = [
+  { id: "off", label: "Tắt", hint: "Chỉ dùng nội dung video, không tìm web." },
+  { id: "auto", label: "Tự động", hint: "Chỉ tìm web khi nội dung video không đủ trả lời." },
+  { id: "always", label: "Luôn tìm", hint: "Luôn tìm web kèm nội dung video cho mỗi câu hỏi." },
+];
+
 function defaultRegenStep(engine) {
   return engine === "supertonic" ? 8 : 48;
 }
@@ -204,6 +223,7 @@ export default function VideoDetail() {
   const [ragProvider, setRagProvider] = useState(FALLBACK_RAG_MODELS.default_provider);
   const [ragModel, setRagModel] = useState(FALLBACK_RAG_MODELS.providers[0].default_model);
   const [ragSessionModel, setRagSessionModel] = useState(null);
+  const [ragWebMode, setRagWebMode] = useState("off");
   const playerRef = useRef(null);
   const pendingSeekRef = useRef(null);
   const summaryLoadingRef = useRef(null);
@@ -341,6 +361,7 @@ export default function VideoDetail() {
         question,
         answer: "",
         sources: [],
+        webSources: [],
         pending: true,
       },
     ]);
@@ -353,6 +374,7 @@ export default function VideoDetail() {
         ragSummary.summary,
         ragSessionModel.provider,
         ragSessionModel.model,
+        ragWebMode,
       );
       setRagMessages((current) => current.map((message) => (
         message.id === messageId
@@ -360,6 +382,7 @@ export default function VideoDetail() {
               ...message,
               answer: result.answer || "",
               sources: result.sources || [],
+              webSources: result.web_sources || [],
               pending: false,
             }
           : message
@@ -372,6 +395,7 @@ export default function VideoDetail() {
               ...message,
               answer: "",
               sources: [],
+              webSources: [],
               error: cleanError(error),
               pending: false,
             }
@@ -436,7 +460,14 @@ export default function VideoDetail() {
   }
 
   if (err) return <main className="page-content"><div className="tag-fail">{err}</div></main>;
-  if (!meta) return <main className="page-content"><div className="empty-state">Đang tải video…</div></main>;
+  if (!meta) return (
+    <main className="page-content">
+      <div className="empty-state">
+        <span className="eq-loader" aria-hidden="true" />
+        Đang tải video…
+      </div>
+    </main>
+  );
 
   const stats = [
     meta.channel,
@@ -456,6 +487,9 @@ export default function VideoDetail() {
     ? "Đổi model"
     : (ragSummaryState?.status === "error" ? "Thử lại" : "Bắt đầu hỏi đáp");
   const redubRunning = redubState?.status === "running";
+  const hasTranslatedChapters = Array.isArray(meta.chapters) && meta.chapters.length > 0 && (
+    meta.chapters.every((chapter) => String(chapter?.title_vi || "").trim())
+  );
 
   return (
     <main className="page-content watch-content">
@@ -472,12 +506,17 @@ export default function VideoDetail() {
               vi: `${api.subtitleUrl(id, "vi")}?v=${revision}`,
               en: `${api.subtitleUrl(id, "en")}?v=${revision}`,
             }}
+            chapters={hasTranslatedChapters ? `${api.chapterUrl(id)}?v=${revision}` : null}
           />
 
           <h1 className="watch-title">{meta.title}</h1>
           <div className="watch-meta-row">
             <div className="channel-block">
-              <div className="channel-avatar large">{meta.channel?.slice(0, 1)?.toUpperCase() || "T"}</div>
+              <div className="channel-avatar large">
+                {meta.channel_avatar
+                  ? <img src={meta.channel_avatar} alt="" referrerPolicy="no-referrer" />
+                  : (meta.channel?.slice(0, 1)?.toUpperCase() || "T")}
+              </div>
               <div>
                 <div className="channel-name">{meta.channel}</div>
                 <div className="video-meta">{stats}</div>
@@ -512,7 +551,11 @@ export default function VideoDetail() {
                     <div className="dub-progress-fill" style={{ width: `${redubState.progress || 0}%` }} />
                   </div>
                   <div className="dub-progress-label">
-                    <span>{redubState.stage}</span><span>{redubState.progress || 0}%</span>
+                    <span className="dub-progress-stage">
+                      <span className="eq-loader" aria-hidden="true" />
+                      {redubState.stage}
+                    </span>
+                    <span>{redubState.progress || 0}%</span>
                   </div>
                 </div>
               )}
@@ -631,7 +674,7 @@ export default function VideoDetail() {
                         <span>Tóm tắt video</span>
                         {ragSessionModel && <em>{ragSessionModel.provider} · {ragSessionModel.model}</em>}
                       </div>
-                      <p>{ragSummary.summary}</p>
+                      <RagMarkdown text={ragSummary.summary} />
                     </article>
                   )}
                   {ragSummaryState?.status === "error" && (
@@ -654,7 +697,7 @@ export default function VideoDetail() {
                       ) : (
                         <>
                           <div className="rag-answer">
-                            <p>{message.answer}</p>
+                            <RagMarkdown text={message.answer} />
                           </div>
                           {message.sources.length > 0 && (
                             <div className="rag-sources">
@@ -672,6 +715,23 @@ export default function VideoDetail() {
                               ))}
                             </div>
                           )}
+                          {message.webSources?.length > 0 && (
+                            <div className="rag-sources">
+                              <div className="rag-sources-title">Nguồn web</div>
+                              {message.webSources.map((source, index) => (
+                                <a
+                                  key={`${message.id}-web-${index}`}
+                                  className="rag-source"
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  <span className="rag-source-time">{source.domain}</span>
+                                  <small>{source.title || source.snippet}</small>
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </>
                       )}
                     </article>
@@ -682,6 +742,20 @@ export default function VideoDetail() {
                       <p>Đang trả lời...</p>
                     </div>
                   )}
+                </div>
+                <div className="rag-web-mode" role="group" aria-label="Chế độ tìm web">
+                  {RAG_WEB_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      className={ragWebMode === mode.id ? "active" : ""}
+                      disabled={ragBusy}
+                      onClick={() => setRagWebMode(mode.id)}
+                      title={mode.hint}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
                 </div>
                 <form className="rag-input-row" onSubmit={askRag}>
                   <textarea
@@ -809,7 +883,11 @@ export default function VideoDetail() {
                   <div className="dub-progress-fill" style={{ width: `${regenState.progress || 0}%` }} />
                 </div>
                 <div className="dub-progress-label">
-                  <span>{regenState.stage}</span><span>{regenState.progress || 0}%</span>
+                  <span className="dub-progress-stage">
+                    <span className="eq-loader" aria-hidden="true" />
+                    {regenState.stage}
+                  </span>
+                  <span>{regenState.progress || 0}%</span>
                 </div>
               </div>
             )}

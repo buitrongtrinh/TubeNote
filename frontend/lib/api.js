@@ -41,7 +41,9 @@ export const api = {
     jpost("/api/translate", { prompt_index, prompt, provider, model }),
   translateStatus: (jobId) => jget(`/api/translate/${jobId}`),
   ttsModels: () => jget("/api/tts/models"),
-  dub: (url, segments, tts) => jpost("/api/dub", { url, segments, tts }),
+  dub: (url, segments, tts, chapter_titles = null) => jpost("/api/dub", {
+    url, segments, tts, chapter_titles,
+  }),
   dubStatus: (jobId) => jget(`/api/dub/${jobId}`),
   regenerateSegment: (vid, segmentIndex, text_vi, pronunciation_map = {}, num_step = 48) =>
     jpost(`/api/video/${vid}/segments/${segmentIndex}/regenerate`, {
@@ -50,11 +52,14 @@ export const api = {
   regenerateVideo: (vid) => jpost(`/api/video/${encodeURIComponent(vid)}/regenerate`, {}),
   regenerateStatus: (jobId) => jget(`/api/regenerate/${jobId}`),
   ragModels: () => jget("/api/rag/models"),
-  askRag: (vid, question, history = [], summary = "", provider = "deepseek", model = "deepseek-v4-flash") =>
-    jpost(`/api/rag/video/${encodeURIComponent(vid)}/ask`, { question, history, summary, provider, model }),
+  askRag: (vid, question, history = [], summary = "", provider = "deepseek", model = "deepseek-v4-flash", webMode = "off") =>
+    jpost(`/api/rag/video/${encodeURIComponent(vid)}/ask`, { question, history, summary, provider, model, web_mode: webMode }),
   ragSummary: (vid, provider = "deepseek", model = "deepseek-v4-flash") =>
     jget(`/api/rag/video/${encodeURIComponent(vid)}/summary?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`),
   streamUrl: (vid) => `/api/stream/${vid}`,
   transcript: (vid) => jget(`/api/video/${vid}/transcript`),
   subtitleUrl: (vid, lang) => `/api/video/${vid}/subtitles/${lang}`,
+  chapterUrl: (vid) => `/api/video/${vid}/chapters`,
+  chapterTranslationPrompt: (vid) => jget(`/api/video/${encodeURIComponent(vid)}/chapters/prompt`),
+  validateChapters: (vid, response) => jpost(`/api/video/${encodeURIComponent(vid)}/chapters/validate`, { response }),
 };

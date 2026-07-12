@@ -17,7 +17,9 @@ const DEFAULT_TTS_CONFIG = {
   instruction: "",
   instruction_tags: [],
   num_step: 8,
-  keep_background: true,
+  // Mặc định TẮT nhạc nền: tách nền chạy Demucs mất thêm vài phút mỗi video,
+  // người dùng chủ động bật khi cần thay vì phải nhớ tắt.
+  keep_background: false,
   batch_size: 0, // 0 = auto theo VRAM detect; >0 = từ VRAM người dùng nhập
 };
 
@@ -34,8 +36,6 @@ const TTS_QUALITY_OPTIONS = {
     { value: 48, label: "Tối đa · 48 steps" },
   ],
 };
-
-const OMNIVOICE_BATCH_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 8, 12, 16];
 
 const TRANSLATION_PROVIDERS = [
   { id: "chatgpt", label: "ChatGPT", url: "https://chatgpt.com/" },
@@ -129,10 +129,12 @@ function hasObjectData(value) {
   return value && typeof value === "object" && Object.keys(value).length > 0;
 }
 
-function hasDraftWork({ responses, validated, dubJobId, dubbing }) {
+function hasDraftWork({ responses, validated, chapterResponse, chapterValidation, dubJobId, dubbing }) {
   return (
     hasObjectData(responses) ||
     hasObjectData(validated) ||
+    Boolean(chapterResponse?.trim()) ||
+    Boolean(chapterValidation) ||
     Boolean(dubJobId) ||
     Boolean(dubbing)
   );
@@ -238,7 +240,7 @@ function normalizeTtsConfig(value, fallbackModel = "M5", fallbackEngine = "super
     instruction: cfg.instruction || "",
     instruction_tags: Array.isArray(cfg.instruction_tags) ? cfg.instruction_tags : [],
     num_step: numStep,
-    keep_background: cfg.keep_background !== false,
+    keep_background: cfg.keep_background === true,
     batch_size: Number(cfg.batch_size) > 0 ? Math.floor(Number(cfg.batch_size)) : 0,
   };
 }
@@ -259,12 +261,24 @@ function ttsConfigForEngine(engine, fallbackModels = ["M5"]) {
     instruction: "",
     instruction_tags: [],
     num_step: defaultNumStepForEngine(engineId),
-    keep_background: true,
+    keep_background: false,
   }, model, engineId);
 }
 
 function isWhisperLoadStage(stage) {
   return /Whisper|nhận diện giọng nói/i.test(stage || "");
+}
+
+// Thanh % khi dubbing CHỈ dành cho pha text-to-speech (giống Whisper lúc
+// load): backend gửi stage "Tổng hợp giọng nói {done}/{total}" -> tính %
+// theo số câu. Các pha khác (load model, Demucs, trộn video) không có tiến
+// độ chi tiết -> hiện chữ + loader, không vẽ % giả đứng hình.
+function parseTtsProgress(stage) {
+  const match = /Tổng hợp giọng nói (\d+)\/(\d+)/.exec(stage || "");
+  if (!match) return null;
+  const done = Number(match[1]);
+  const total = Math.max(1, Number(match[2]));
+  return { done, total, pct: Math.min(100, Math.round((done / total) * 100)) };
 }
 
 export default function AddPage() {
@@ -278,6 +292,12 @@ export default function AddPage() {
   const [apiPrompts, setApiPrompts] = useState([]);
   const [responses, setResponses] = useState({});
   const [validated, setValidated] = useState({}); // i -> {ok, error, segments}
+  const [chapterPrompt, setChapterPrompt] = useState("");
+  const [chapterResponse, setChapterResponse] = useState("");
+  const [chapterValidation, setChapterValidation] = useState(null);
+  const [chapterTranslating, setChapterTranslating] = useState(false);
+  const [chapterModalOpen, setChapterModalOpen] = useState(false);
+  const [chapterCopied, setChapterCopied] = useState(false);
   const [dubbing, setDubbing] = useState(false);
   const [stage, setStage] = useState("");
   const [progress, setProgress] = useState(0);
@@ -299,6 +319,14 @@ export default function AddPage() {
   const [hwDirty, setHwDirty] = useState(false);
   const [hwDetecting, setHwDetecting] = useState(false);
   const [hwApplying, setHwApplying] = useState(false);
+  // Trạng thái THUẦN hiển thị: khối cấu hình phần cứng gập/mở. Mặc định gập
+  // (cấu hình là việc 1 lần mỗi máy); tự mở ở lần đầu khi máy chưa lưu gì.
+  // Set trong effect (không phải initializer) để SSR/client render lần đầu
+  // giống nhau — tránh hydration mismatch trên thuộc tính open.
+  const [hwConfigOpen, setHwConfigOpen] = useState(false);
+  useEffect(() => {
+    if (!readStoredHardware()) setHwConfigOpen(true);
+  }, []);
   const [translationMode, setTranslationMode] = useState("manual");
   const [translationModelConfig, setTranslationModelConfig] = useState(FALLBACK_TRANSLATION_MODELS);
   const [translationProvider, setTranslationProvider] = useState(FALLBACK_TRANSLATION_MODELS.default_provider);
@@ -310,6 +338,11 @@ export default function AddPage() {
   const pollingJobRef = useRef(null);
   const suppressDraftRef = useRef(false);
   const autoLoadRef = useRef(false);
+  const dubbingRef = useRef(false);
+
+  useEffect(() => {
+    dubbingRef.current = dubbing;
+  }, [dubbing]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -327,6 +360,9 @@ export default function AddPage() {
         setApiPrompts(Array.isArray(saved.apiPrompts) ? saved.apiPrompts : []);
         setResponses(saved.responses || {});
         setValidated(saved.validated || {});
+        setChapterPrompt(saved.chapterPrompt || "");
+        setChapterResponse(saved.chapterResponse || "");
+        setChapterValidation(saved.chapterValidation || null);
         setStage(saved.stage || "");
         setProgress(Number(saved.progress) || 0);
         setExpandedResponses(saved.expandedResponses || {});
@@ -502,13 +538,34 @@ export default function AddPage() {
       .catch(() => {});
   }, [restoredDraft, meta?.video_id]);
 
+  // Draft tạo trước khi tính năng phân cảnh ra mắt chưa có chapterPrompt trong
+  // localStorage. Lấy lại từ metadata để UI và cổng Dub cùng một trạng thái.
+  useEffect(() => {
+    if (
+      !restoredDraft ||
+      !meta?.video_id ||
+      chapterPrompt ||
+      !Array.isArray(meta.chapters) ||
+      meta.chapters.length === 0
+    ) return;
+    api.chapterTranslationPrompt(meta.video_id)
+      .then((result) => {
+        if (mountedRef.current && typeof result?.prompt === "string") {
+          setChapterPrompt(result.prompt);
+        }
+      })
+      .catch(() => {});
+  }, [restoredDraft, meta?.video_id, meta?.chapters, chapterPrompt]);
+
   useEffect(() => {
     if (!restoredDraft) return;
     if (suppressDraftRef.current) {
       localStorage.removeItem(DRAFT_KEY);
       return;
     }
-    const hasDraft = hasDraftWork({ responses, validated, dubJobId, dubbing });
+    const hasDraft = hasDraftWork({
+      responses, validated, chapterResponse, chapterValidation, dubJobId, dubbing,
+    });
     if (!hasDraft) {
       localStorage.removeItem(DRAFT_KEY);
       return;
@@ -521,6 +578,9 @@ export default function AddPage() {
       apiPrompts,
       responses,
       validated,
+      chapterPrompt,
+      chapterResponse,
+      chapterValidation,
       dubbing,
       stage,
       progress,
@@ -542,6 +602,9 @@ export default function AddPage() {
     apiPrompts,
     responses,
     validated,
+    chapterPrompt,
+    chapterResponse,
+    chapterValidation,
     dubbing,
     stage,
     progress,
@@ -555,7 +618,9 @@ export default function AddPage() {
     expandedResponses,
   ]);
 
-  const hasSavedDraft = hasDraftWork({ responses, validated, dubJobId, dubbing });
+  const hasSavedDraft = hasDraftWork({
+    responses, validated, chapterResponse, chapterValidation, dubJobId, dubbing,
+  });
 
   function setJobParam(jobId) {
     if (typeof window === "undefined") return;
@@ -575,6 +640,13 @@ export default function AddPage() {
     setApiPrompts([]);
     setResponses({});
     setValidated({});
+    setChapterPrompt("");
+    setChapterResponse("");
+    setChapterValidation(null);
+    setChapterTranslating(false);
+    setChapterModalOpen(false);
+    setChapterCopied(false);
+    dubbingRef.current = false;
     setDubbing(false);
     setStage("");
     setProgress(0);
@@ -607,6 +679,12 @@ export default function AddPage() {
       localStorage.removeItem(DRAFT_KEY);
       setResponses({});
       setValidated({});
+      setChapterPrompt("");
+      setChapterResponse("");
+      setChapterValidation(null);
+      setChapterTranslating(false);
+      setChapterModalOpen(false);
+      setChapterCopied(false);
       setExpandedResponses({});
       setTranslatingPrompts({});
       setDubJobId(null);
@@ -619,6 +697,7 @@ export default function AddPage() {
     setLoading(true);
     setLoadStage("Bắt đầu");
     setLoadProgress(0);
+    dubbingRef.current = false;
     setDubbing(false);
     setDubJobId(null);
     setJobParam(null);
@@ -649,6 +728,12 @@ export default function AddPage() {
           setMeta(data.metadata);
           setPrompts(Array.isArray(data.prompts) ? data.prompts : []);
           setApiPrompts(Array.isArray(data.api_prompts) && data.api_prompts.length ? data.api_prompts : (Array.isArray(data.prompts) ? data.prompts : []));
+          setChapterPrompt(typeof data.chapter_prompt === "string" ? data.chapter_prompt : "");
+          setChapterResponse("");
+          setChapterValidation(null);
+          setChapterTranslating(false);
+          setChapterModalOpen(false);
+          setChapterCopied(false);
           setTranslationBatching({ ...DEFAULT_TRANSLATION_BATCHING, ...(data.translation_batching || {}) });
           setResponses({});
           setValidated({});
@@ -709,9 +794,15 @@ export default function AddPage() {
   }
 
   function changeTranslationMode(mode) {
+    if (dubbingRef.current || loading) return;
     setTranslationMode(mode);
     setResponses({});
     setValidated({});
+    setChapterResponse("");
+    setChapterValidation(null);
+    setChapterTranslating(false);
+    setChapterModalOpen(false);
+    setChapterCopied(false);
     setExpandedResponses({});
     setCopiedIdx(null);
     setModalIdx(null);
@@ -755,17 +846,33 @@ export default function AddPage() {
   }
 
   async function onValidate(i) {
+    if (dubbingRef.current || loading || translatingPrompts[i]) return;
     const res = await validateBatch(i);
+    if (dubbingRef.current) return;
     setValidated((v) => ({ ...v, [i]: res }));
     if (!res.ok && res.segments?.length) {
       setExpandedResponses((cur) => ({ ...cur, [`content-${i}`]: true }));
     }
   }
 
-  async function requestApiTranslation(i, promptText, deadlineMs) {
+  function updateChapterResponse(value) {
+    if (dubbingRef.current) return;
+    setChapterResponse(value);
+    setChapterValidation(null);
+  }
+
+  async function validateChapterTranslation() {
+    if (dubbingRef.current || loading || chapterTranslating || !meta?.video_id || !chapterResponse.trim()) return null;
+    const result = await api.validateChapters(meta.video_id, chapterResponse);
+    if (dubbingRef.current) return null;
+    setChapterValidation(result);
+    return result;
+  }
+
+  async function requestApiTranslation(i, promptText, deadlineMs, label = `prompt ${i + 1}`) {
     const remainingForCreate = deadlineMs - Date.now();
     if (remainingForCreate <= 0) {
-      throw new Error(`Prompt ${i + 1} dịch quá thời gian cho phép.`);
+      throw new Error(`${label} dịch quá thời gian cho phép.`);
     }
     const { job_id } = await withTimeout(
       api.translatePrompt(
@@ -775,22 +882,22 @@ export default function AddPage() {
         translationModel,
       ),
       Math.min(API_STATUS_TIMEOUT_MS, remainingForCreate),
-      `Không tạo được job dịch prompt ${i + 1} trong thời gian cho phép.`,
+      `Không tạo được job dịch ${label} trong thời gian cho phép.`,
     );
     while (true) {
       const remaining = deadlineMs - Date.now();
       if (remaining <= 0) {
-        throw new Error(`Prompt ${i + 1} dịch quá thời gian cho phép.`);
+        throw new Error(`${label} dịch quá thời gian cho phép.`);
       }
       await wait(Math.min(1200, remaining));
       const statusRemaining = deadlineMs - Date.now();
       if (statusRemaining <= 0) {
-        throw new Error(`Prompt ${i + 1} dịch quá thời gian cho phép.`);
+        throw new Error(`${label} dịch quá thời gian cho phép.`);
       }
       const status = await withTimeout(
         api.translateStatus(job_id),
         Math.min(API_STATUS_TIMEOUT_MS, statusRemaining),
-        `Không lấy được trạng thái dịch prompt ${i + 1}.`,
+        `Không lấy được trạng thái dịch ${label}.`,
       );
       if (status.status === "done") {
         return status.result?.response || "";
@@ -839,6 +946,7 @@ export default function AddPage() {
     try {
       const result = await translatePromptTextWithRetry(i, translatedPromptText(activePrompts[i]));
       const text = result.response || "";
+      if (dubbingRef.current) return null;
       setResponses((cur) => ({ ...cur, [i]: text }));
       const validation = result.validation || await validateResponseText(i, text);
       setValidated((cur) => ({ ...cur, [i]: validation }));
@@ -858,22 +966,50 @@ export default function AddPage() {
     }
   }
 
+  async function translateChaptersByApi() {
+    if (!meta?.video_id || !chapterPrompt || chapterTranslating || dubbing || loading) return null;
+    setError("");
+    setChapterTranslating(true);
+    try {
+      const text = await requestApiTranslation(
+        -1,
+        chapterPrompt,
+        Date.now() + apiJobTimeoutMs,
+        "phân cảnh",
+      );
+      if (dubbingRef.current) return null;
+      setChapterResponse(text);
+      const validation = await api.validateChapters(meta.video_id, text);
+      setChapterValidation(validation);
+      return validation;
+    } catch (e) {
+      setError(String(e.message || e));
+      return null;
+    } finally {
+      setChapterTranslating(false);
+    }
+  }
+
   async function translateAllByApi() {
     if (!activePrompts.length || dubbing || loading) return;
     setError("");
     const indexes = activePrompts
       .map((_, i) => i)
       .filter((i) => !validated[i]?.ok);  // batch có cảnh báo (ok) coi như đã dịch xong, không dịch lại
-    if (!indexes.length) return;
+    const tasks = indexes.map((i) => () => translatePromptByApi(i));
+    if (chapterPrompt && !chapterValidation?.ok) {
+      tasks.push(() => translateChaptersByApi());
+    }
+    if (!tasks.length) return;
 
     let cursor = 0;
     let failed = 0;
-    const limit = Math.min(apiConcurrency, indexes.length);
+    const limit = Math.min(apiConcurrency, tasks.length);
     const worker = async () => {
-      while (cursor < indexes.length) {
-        const i = indexes[cursor];
+      while (cursor < tasks.length) {
+        const task = tasks[cursor];
         cursor += 1;
-        const result = await translatePromptByApi(i);
+        const result = await task();
         if (!result?.ok) {  // chỉ lỗi cấu trúc mới tính là fail; cảnh báo độ dài thì bỏ qua
           failed += 1;
         }
@@ -883,11 +1019,12 @@ export default function AddPage() {
     await Promise.all(Array.from({ length: limit }, worker));
 
     if (failed > 0) {
-      setError(`${failed}/${indexes.length} prompt API chưa đạt xác nhận. Mở các dòng đỏ để xem lỗi hoặc bấm dịch lại.`);
+      setError(`${failed}/${tasks.length} mục API chưa đạt xác nhận. Mở mục lỗi để xem hoặc bấm dịch lại.`);
     }
   }
 
   function copyPrompt(text, i) {
+    if (dubbingRef.current) return;
     navigator.clipboard?.writeText(promptForEngine(
       text,
       selectedTtsEngine.id,
@@ -895,6 +1032,13 @@ export default function AddPage() {
     ));
     setCopiedIdx(i);
     setTimeout(() => setCopiedIdx((cur) => (cur === i ? null : cur)), 1500);
+  }
+
+  function copyChapterPrompt() {
+    if (dubbingRef.current) return;
+    navigator.clipboard?.writeText(chapterPrompt);
+    setChapterCopied(true);
+    setTimeout(() => setChapterCopied(false), 1500);
   }
 
   function openTranslationProvider(provider) {
@@ -907,6 +1051,7 @@ export default function AddPage() {
   }
 
   function updateResponse(i, value) {
+    if (dubbingRef.current) return;
     setResponses((r) => ({ ...r, [i]: value }));
     setValidated((v) => {
       if (!v[i]) return v;
@@ -922,9 +1067,14 @@ export default function AddPage() {
   const allValid = activePrompts.length > 0 && activePrompts.every((_, i) => (
     validated[i]?.ok
   ));
+  const hasChapters = Boolean(chapterPrompt);
+  const chaptersValid = !hasChapters || Boolean(chapterValidation?.ok);
+  const translationsRunning = Object.keys(translatingPrompts).length > 0 || chapterTranslating;
+  const readyToDub = allValid && chaptersValid && !translationsRunning;
 
   async function pollDubJob(jobId) {
     pollingJobRef.current = jobId;
+    dubbingRef.current = true;
     setDubbing(true);
     while (mountedRef.current && pollingJobRef.current === jobId) {
       try {
@@ -938,6 +1088,7 @@ export default function AddPage() {
         }
         if (s.status === "error") {
           setError(s.error || "Lỗi không xác định");
+          dubbingRef.current = false;
           setDubbing(false);
           setDubJobId(null);
           setJobParam(null);
@@ -954,6 +1105,7 @@ export default function AddPage() {
           } catch {}
         }
         setError(`Không thể khôi phục tiến trình dubbing: ${String(e)}`);
+        dubbingRef.current = false;
         setDubbing(false);
         setDubJobId(null);
         setJobParam(null);
@@ -965,7 +1117,9 @@ export default function AddPage() {
   }
 
   async function onDub() {
+    if (!readyToDub || translationsRunning) return;
     suppressDraftRef.current = false;
+    dubbingRef.current = true;
     setDubbing(true);
     setProgress(0);
     setStage("Bắt đầu");
@@ -985,12 +1139,18 @@ export default function AddPage() {
           model: translationMode === "api" ? translationModel : "ChatGPT",
         },
       };
-      const { job_id } = await api.dub(url, segments, dubTtsConfig);
+      const { job_id } = await api.dub(
+        url,
+        segments,
+        dubTtsConfig,
+        hasChapters ? chapterValidation?.titles || null : null,
+      );
       setDubJobId(job_id);
       setJobParam(job_id);
       await pollDubJob(job_id);
     } catch (e) {
       setError(String(e));
+      dubbingRef.current = false;
       setDubbing(false);
       setDubJobId(null);
       setJobParam(null);
@@ -1082,17 +1242,9 @@ export default function AddPage() {
         : `preset:${voice.id}` === ttsVoiceChoice
     ))?.label || ttsVoiceChoice;
   const ttsQualityOptions = TTS_QUALITY_OPTIONS[selectedTtsEngine.id] || TTS_QUALITY_OPTIONS.supertonic;
-  const recommendedOmniBatch = hwRec?.tts_engine === "omnivoice"
-    ? Number(hwRec.omnivoice_batch_size) || 0
-    : 0;
-  const ttsBatchOptions = Array.from(new Set([
-    ...OMNIVOICE_BATCH_OPTIONS,
-    recommendedOmniBatch,
-    Number(ttsConfig.batch_size) || 0,
-  ])).filter((value) => value >= 0).sort((a, b) => a - b);
   const currentTranslationProvider = selectedTranslationProvider();
   const currentTranslationModels = currentTranslationProvider?.models || [];
-  const translatingCount = Object.keys(translatingPrompts).length;
+  const translatingCount = Object.keys(translatingPrompts).length + (chapterTranslating ? 1 : 0);
   const translatingAny = translatingCount > 0;
 
   function updateTtsConfig(patch) {
@@ -1128,12 +1280,8 @@ export default function AddPage() {
   const hwRecPresetLabel = hwRec
     ? (availableSpeechPresets.find((preset) => preset.id === hwRec.asr_preset)?.label || hwRec.asr_preset)
     : "";
-  const hwRecSummary = hwRec
-    ? `${hwRecPresetLabel} · ${hwRec.tts_engine === "omnivoice" ? "OmniVoice - GPU" : "Supertonic - CPU"}` +
-      (hwRec.tts_engine === "omnivoice" && hwRec.omnivoice_batch_size
-        ? ` · batch ${hwRec.omnivoice_batch_size}`
-        : "") +
-      ` · ${hwRec.whisper_cpu_threads} threads`
+  const hwRecTtsLabel = hwRec
+    ? (hwRec.tts_engine === "omnivoice" ? "OmniVoice - GPU" : "Supertonic - CPU")
     : "";
 
   async function applyHardwareRecommendation(rec) {
@@ -1224,9 +1372,9 @@ export default function AddPage() {
           </div>
           <div className={activePrompts.length ? "step done" : "step"}>
             <span>2</span>
-            <div><b>Dịch lời thoại</b><p>Kiểm tra số dòng trước khi ghép.</p></div>
+            <div><b>Dịch nội dung</b><p>Kiểm tra lời thoại và phân cảnh trước khi ghép.</p></div>
           </div>
-          <div className={allValid ? "step done" : "step"}>
+          <div className={readyToDub ? "step done" : "step"}>
             <span>3</span>
             <div><b>Dubbing</b><p>Tạo giọng đọc và xuất video.</p></div>
           </div>
@@ -1265,138 +1413,145 @@ export default function AddPage() {
                 {loading ? "Đang tải" : "Load"}
               </button>
             </div>
-            <div className="load-options hw-options">
-              <label className="tts-select">
-                <span>RAM (GB)</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={hwRam}
-                  onChange={(event) => onHardwareInputChange("ram", event.target.value)}
-                  disabled={loading || dubbing}
-                />
-              </label>
-              <label className="tts-select">
-                <span>VRAM GPU (GB)</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="0 = không có"
-                  value={hwVram}
-                  onChange={(event) => onHardwareInputChange("vram", event.target.value)}
-                  disabled={loading || dubbing}
-                />
-              </label>
-              <em>{hardwareHint}</em>
-              <div className="hw-actions">
-                <button
-                  type="button"
-                  onClick={detectHardwareInput}
-                  disabled={loading || dubbing || hwDetecting || hwApplying}
-                >
-                  {hwDetecting ? "Đang phát hiện" : "Tự phát hiện"}
-                </button>
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={applyHardwareInputs}
-                  disabled={loading || dubbing || hwDetecting || hwApplying || Boolean(!hwDirty && hwRec)}
-                >
-                  {hwApplying ? "Đang áp dụng" : "Áp dụng cấu hình"}
-                </button>
-              </div>
-            </div>
-            {(hwRecSummary || hwDirty) && (
-              <div className={`hw-recommend${hwDirty ? " pending" : ""}`}>
-                {hwRecSummary ? (
-                  <>
-                    {hwDirty ? "Đang dùng cấu hình đã áp dụng: " : "Đề xuất đang áp dụng: "}
-                    <b>{hwRecSummary}</b>
-                  </>
-                ) : (
-                  "Chưa có cấu hình phần cứng đã áp dụng."
+            {/* Cấu hình phần cứng là việc 1 lần mỗi máy -> gập thành 1 dòng
+                tóm tắt để luồng chính (dán URL -> Load) không bị 8 control
+                che khuất. Mọi control/handler bên trong giữ nguyên. */}
+            <details
+              className="hw-config"
+              open={hwConfigOpen}
+              onToggle={(event) => setHwConfigOpen(event.target.open)}
+            >
+              <summary>
+                <span className="hw-config-caret" aria-hidden="true">▸</span>
+                <span className="hw-config-label">Phần cứng</span>
+                <b>{hwRec ? `${hwRecPresetLabel} · ${hwRecTtsLabel}` : "Chưa áp dụng cấu hình"}</b>
+                <span className="hw-config-end">
+                  {hwDirty && <em className="hw-config-dirty">Chưa áp dụng thay đổi</em>}
+                  <span className="hw-config-hint">{hwConfigOpen ? "Thu gọn" : "Chỉnh"}</span>
+                </span>
+              </summary>
+              <div className="hw-config-body">
+                <div className="load-options hw-options">
+                  <label className="tts-select">
+                    <span>RAM (GB)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={hwRam}
+                      onChange={(event) => onHardwareInputChange("ram", event.target.value)}
+                      disabled={loading || dubbing}
+                    />
+                  </label>
+                  <label className="tts-select">
+                    <span>VRAM GPU (GB)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder=""
+                      value={hwVram}
+                      onChange={(event) => onHardwareInputChange("vram", event.target.value)}
+                      disabled={loading || dubbing}
+                    />
+                  </label>
+                  <em>{hardwareHint}</em>
+                  <div className="hw-actions">
+                    <button
+                      type="button"
+                      onClick={detectHardwareInput}
+                      disabled={loading || dubbing || hwDetecting || hwApplying}
+                    >
+                      {hwDetecting ? "Đang phát hiện" : "Tự phát hiện"}
+                    </button>
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={applyHardwareInputs}
+                      disabled={loading || dubbing || hwDetecting || hwApplying || Boolean(!hwDirty && hwRec)}
+                    >
+                      {hwApplying ? "Đang áp dụng" : "Áp dụng cấu hình"}
+                    </button>
+                  </div>
+                </div>
+                {(hwRec || hwDirty) && (
+                  <div className={`hw-recommend${hwDirty ? " pending" : ""}`}>
+                    {hwRec ? (
+                      <>
+                        <p>{hwDirty ? "Đang dùng cấu hình đã áp dụng:" : "Đề xuất đang áp dụng:"}</p>
+                        <p>Mô hình ASR: <b>{hwRecPresetLabel}</b></p>
+                        <p>Mô hình TTS: <b>{hwRecTtsLabel}</b></p>
+                      </>
+                    ) : (
+                      <p>Chưa có cấu hình phần cứng đã áp dụng.</p>
+                    )}
+                    {hwDirty && (
+                      <p className="hw-dirty-hint">Thông số RAM/VRAM đã đổi, nhấn áp dụng cấu hình để cập nhật lựa chọn.</p>
+                    )}
+                  </div>
                 )}
-                {hwDirty && (
-                  <span> Thông số RAM/VRAM đã đổi, nhấn áp dụng cấu hình để cập nhật lựa chọn.</span>
-                )}
+                <div className="load-options">
+                  <label className="tts-select">
+                    <span>Mô hình ASR</span>
+                    <select
+                      value={selectedSpeechPreset.id}
+                      onChange={(event) => changeAsrModel(event.target.value)}
+                      disabled={loading || dubbing || currentAsrOptions.length <= 1}
+                    >
+                      {currentAsrOptions.map((preset) => {
+                        const reason = hardwareOptionReason(hwRec, "asr", preset.id);
+                        return (
+                          <option key={preset.id} value={preset.id} disabled={Boolean(reason)}>
+                            {asrModelLabel(preset)}{reason ? ` (${reason})` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                  {selectedSpeechPreset.description && (
+                    <em>{selectedSpeechPreset.description}</em>
+                  )}
+                </div>
+                <div className="load-options tts-engine-options">
+                  <label className="tts-select">
+                    <span>Mô hình TTS</span>
+                    <select
+                      value={selectedTtsEngine.id}
+                      onChange={(event) => changeTtsModel(event.target.value)}
+                      disabled={loading || dubbing || currentTtsEngineOptions.length <= 1}
+                    >
+                      {currentTtsEngineOptions.map((engine) => {
+                        const reason = hardwareOptionReason(hwRec, "tts", engine.id);
+                        return (
+                          <option key={engine.id} value={engine.id} disabled={Boolean(reason)}>
+                            {ttsModelLabel(engine)}{reason ? ` (${reason})` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                  {selectedTtsEngine.description && (
+                    <em>{selectedTtsEngine.description}</em>
+                  )}
+                </div>
               </div>
-            )}
-            <div className="load-options">
-              <label className="tts-select">
-                <span>Mô hình ASR</span>
-                <select
-                  value={selectedSpeechPreset.id}
-                  onChange={(event) => changeAsrModel(event.target.value)}
-                  disabled={loading || dubbing || currentAsrOptions.length <= 1}
-                >
-                  {currentAsrOptions.map((preset) => {
-                    const reason = hardwareOptionReason(hwRec, "asr", preset.id);
-                    return (
-                      <option key={preset.id} value={preset.id} disabled={Boolean(reason)}>
-                        {asrModelLabel(preset)}{reason ? ` (${reason})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-              {selectedSpeechPreset.description && (
-                <em>{selectedSpeechPreset.description}</em>
-              )}
-            </div>
-            <div className="load-options tts-engine-options">
-              <label className="tts-select">
-                <span>Mô hình TTS</span>
-                <select
-                  value={selectedTtsEngine.id}
-                  onChange={(event) => changeTtsModel(event.target.value)}
-                  disabled={loading || dubbing || currentTtsEngineOptions.length <= 1}
-                >
-                  {currentTtsEngineOptions.map((engine) => {
-                    const reason = hardwareOptionReason(hwRec, "tts", engine.id);
-                    return (
-                      <option key={engine.id} value={engine.id} disabled={Boolean(reason)}>
-                        {ttsModelLabel(engine)}{reason ? ` (${reason})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-              {selectedTtsEngine.id === "omnivoice" && (
-                <label className="tts-select">
-                  <span>Batch size</span>
-                  <select
-                    value={Number(ttsConfig.batch_size) || 0}
-                    onChange={(event) => updateTtsConfig({ batch_size: Number(event.target.value) || 0 })}
-                    disabled={loading || dubbing}
-                  >
-                    {ttsBatchOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value === 0
-                          ? "Auto"
-                          : `${value}${value === recommendedOmniBatch ? " · đề xuất" : ""}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {selectedTtsEngine.description && (
-                <em>{selectedTtsEngine.description}</em>
-              )}
-            </div>
+            </details>
           </div>
 
           {loading && (
             <div className="load-progress-box">
-              {loadStage && <div className="stage">{loadStage}…</div>}
+              {loadStage && (
+                <div className="stage stage-running">
+                  <span className="eq-loader" aria-hidden="true" />
+                  <span>{loadStage}…</span>
+                </div>
+              )}
               {showWhisperProgress && (
                 <div className="dub-progress compact">
                   <div className="dub-progress-bar">
                     <div className="dub-progress-fill" style={{ width: `${Math.max(0, Math.min(100, loadProgress))}%` }} />
                   </div>
-                  <div className="dub-progress-label">
-                    <span>Whisper STT</span>
+                  <div className="dub-progress-label progress-percent-only">
                     <span>{Math.max(0, Math.min(100, loadProgress))}%</span>
                   </div>
                 </div>
@@ -1462,12 +1617,28 @@ export default function AddPage() {
                 </div>
                 <div className="section-head">
                   <div>
-                    <h2>Dịch lời thoại</h2>
+                    <h2>Dịch nội dung</h2>
                     <p>
                       {apiTranslationMode
                         ? "Dịch tự động bằng API rồi tự kiểm tra định dạng trước khi dubbing."
                         : "Copy từng prompt sang ChatGPT rồi dán câu trả lời vào đây."}
                     </p>
+                    {/* Nút mở ChatGPT đặt NGAY DƯỚI câu hướng dẫn nhắc tới nó
+                        (đúng dòng chảy đọc), là hành động phụ mở tab ngoài —
+                        không phải CTA cam tranh chú ý với "Xác nhận". */}
+                    {!apiTranslationMode && (
+                      <div className="provider-actions">
+                        {TRANSLATION_PROVIDERS.map((provider) => (
+                          <button
+                            key={provider.id}
+                            className="chip provider-open"
+                            onClick={() => openTranslationProvider(provider)}
+                          >
+                            Mở {provider.label} <span aria-hidden="true">↗</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="translation-tools">
                     <div className="translation-mode-controls">
@@ -1483,7 +1654,7 @@ export default function AddPage() {
                         </select>
                       </label>
                     </div>
-                    {apiTranslationMode ? (
+                    {apiTranslationMode && (
                       <div className="translation-api-controls" aria-label="Dịch bằng API">
                         <label className="tts-select">
                           <span>Provider API</span>
@@ -1522,23 +1693,69 @@ export default function AddPage() {
                           {translatingAny ? `Đang dịch ${translatingCount}` : "Dịch tất cả bằng API"}
                         </button>
                       </div>
-                    ) : (
-                      <div className="provider-actions">
-                        {TRANSLATION_PROVIDERS.map((provider) => (
-                          <button
-                            key={provider.id}
-                            className="primary"
-                            onClick={() => openTranslationProvider(provider)}
-                          >
-                            Mở {provider.label}
-                          </button>
-                        ))}
-                      </div>
                     )}
                   </div>
                 </div>
 
               <div className="prompt-list">
+                {hasChapters && (
+                  <div className="prompt-card chapter-prompt-card" aria-label="Dịch phân cảnh">
+                    <span className="prompt-no" aria-hidden="true">P</span>
+                    <div className="prompt-main">
+                      <span className="chapter-prompt-heading">
+                        <strong>Phân cảnh</strong>
+                        <span>{meta?.chapters?.length || 0} mục</span>
+                      </span>
+                      {apiTranslationMode ? (
+                        <button
+                          type="button"
+                          className="chip"
+                          disabled={loading || dubbing || chapterTranslating || !translationProvider || !translationModel}
+                          onClick={translateChaptersByApi}
+                        >
+                          {chapterTranslating ? "Đang dịch" : (chapterResponse.trim() ? "Dịch lại API" : "Dịch API")}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={"chip chip-copy" + (chapterCopied ? " chip-ok" : "")}
+                          disabled={loading || dubbing}
+                          onClick={copyChapterPrompt}
+                        >
+                          {chapterCopied ? "Đã copy" : "Copy prompt"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="chip chip-pasted"
+                        disabled={loading || dubbing}
+                        onClick={() => setChapterModalOpen(true)}
+                      >
+                        {chapterResponse.trim() ? "Sửa nội dung" : "Dán kết quả dịch"}
+                      </button>
+                    </div>
+                    <div className="prompt-end">
+                      {chapterValidation == null && <span className="tag-wait">Chờ</span>}
+                      {chapterValidation?.ok && <span className="tag-ok">Đã xác nhận</span>}
+                      {chapterValidation && !chapterValidation.ok && <span className="tag-fail">Lỗi</span>}
+                      {dubbing && chapterValidation?.ok && <span className="tag-ok">Đã khóa</span>}
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={!chapterResponse.trim() || loading || dubbing || chapterTranslating}
+                        onClick={validateChapterTranslation}
+                      >
+                        Xác nhận
+                      </button>
+                    </div>
+                    {chapterValidation && !chapterValidation.ok && (
+                      <div className="prompt-error">
+                        <span>Không xác nhận được phân cảnh</span>
+                        <p>{chapterValidation.error || "Kết quả phân cảnh không hợp lệ. Kiểm tra lại số thứ tự và số dòng."}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activePrompts.map((p, i) => {
                   const v = validated[i];
                   const resp = responses[i] ?? "";
@@ -1560,7 +1777,7 @@ export default function AddPage() {
                               {translatingPrompts[i] ? "Đang dịch" : (resp.trim() ? "Dịch lại API" : "Dịch API")}
                             </button>
                             {resp.trim() && (
-                              <button className="chip chip-pasted" onClick={() => setModalIdx(i)}>
+                              <button className="chip chip-pasted" disabled={loading || dubbing} onClick={() => setModalIdx(i)}>
                                 Sửa nội dung
                               </button>
                             )}
@@ -1569,16 +1786,17 @@ export default function AddPage() {
                           <>
                             <button
                               className={"chip chip-copy" + (copiedIdx === i ? " chip-ok" : "")}
+                              disabled={loading || dubbing}
                               onClick={() => copyPrompt(p, i)}
                             >
                               {copiedIdx === i ? "Đã copy" : "Copy prompt"}
                             </button>
                             {resp.trim() ? (
-                              <button className="chip chip-pasted" onClick={() => setModalIdx(i)}>
+                              <button className="chip chip-pasted" disabled={loading || dubbing} onClick={() => setModalIdx(i)}>
                                 Sửa nội dung
                               </button>
                             ) : (
-                              <button className="chip" onClick={() => setModalIdx(i)}>
+                              <button className="chip" disabled={loading || dubbing} onClick={() => setModalIdx(i)}>
                                 Dán kết quả dịch
                               </button>
                             )}
@@ -1592,7 +1810,12 @@ export default function AddPage() {
                           <span className="tag-fail">{v.warnings.length} cảnh báo</span>
                         )}
                         {v && !v.ok && <span className="tag-fail">Lỗi</span>}
-                        <button className="primary" disabled={!resp.trim()} onClick={() => onValidate(i)}>
+                        {dubbing && v?.ok && <span className="tag-ok">Đã khóa</span>}
+                        <button
+                          className="primary"
+                          disabled={!resp.trim() || loading || dubbing || translatingPrompts[i]}
+                          onClick={() => onValidate(i)}
+                        >
                           Xác nhận
                         </button>
                       </div>
@@ -1672,7 +1895,7 @@ export default function AddPage() {
                 <label className="background-toggle">
                   <input
                     type="checkbox"
-                    checked={ttsConfig.keep_background !== false}
+                    checked={ttsConfig.keep_background === true}
                     disabled={dubbing}
                     onChange={(event) => setTtsConfig((current) => ({
                       ...current,
@@ -1681,20 +1904,31 @@ export default function AddPage() {
                   />
                   <span>Giữ nhạc nền (lâu hơn vài phút)</span>
                 </label>
-                <button className="primary" disabled={!allValid || dubbing} onClick={onDub}>
+                <button className="primary" disabled={!readyToDub || dubbing} onClick={onDub}>
                   {dubbing ? "Đang xử lý" : "Bắt đầu dubbing"}
                 </button>
-                {dubbing && (
-                  <div className="dub-progress">
-                    <div className="dub-progress-bar">
-                      <div className="dub-progress-fill" style={{ width: `${progress}%` }} />
+                {dubbing && (() => {
+                  const tts = parseTtsProgress(stage);
+                  return tts ? (
+                    <div className="dub-progress">
+                      <div className="stage stage-running">
+                        <span className="eq-loader" aria-hidden="true" />
+                        <span>{stage}…</span>
+                      </div>
+                      <div className="dub-progress-bar">
+                        <div className="dub-progress-fill" style={{ width: `${tts.pct}%` }} />
+                      </div>
+                      <div className="dub-progress-label progress-percent-only">
+                        <span>{tts.pct}%</span>
+                      </div>
                     </div>
-                    <div className="dub-progress-label">
-                      <span>{stage}</span>
-                      <span>{progress}%</span>
+                  ) : (
+                    <div className="dub-stage-wait">
+                      <span className="eq-loader" aria-hidden="true" />
+                      {stage}…
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1713,6 +1947,7 @@ export default function AddPage() {
               rows={14}
               placeholder={`Dán câu trả lời AI dịch cho prompt ${modalIdx + 1} vào đây...`}
               value={responses[modalIdx] ?? ""}
+              readOnly={dubbing}
               onChange={(e) => updateResponse(modalIdx, e.target.value)}
             />
             <div className="modal-foot">
@@ -1720,7 +1955,35 @@ export default function AddPage() {
               <button
                 className="primary"
                 onClick={() => setModalIdx(null)}
-                disabled={!(responses[modalIdx] ?? "").trim()}
+                disabled={dubbing || !(responses[modalIdx] ?? "").trim()}
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {chapterModalOpen && (
+        <div className="modal-overlay" onClick={() => setChapterModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <span>Kết quả dịch phân cảnh</span>
+              <button className="modal-x" onClick={() => setChapterModalOpen(false)}>✕</button>
+            </div>
+            <textarea
+              autoFocus
+              rows={12}
+              placeholder="Dán câu trả lời AI dịch các tiêu đề phân cảnh vào đây..."
+              value={chapterResponse}
+              readOnly={dubbing}
+              onChange={(e) => updateChapterResponse(e.target.value)}
+            />
+            <div className="modal-foot">
+              <button onClick={() => setChapterModalOpen(false)}>Đóng</button>
+              <button
+                className="primary"
+                onClick={() => setChapterModalOpen(false)}
+                disabled={dubbing || !chapterResponse.trim()}
               >
                 Lưu
               </button>
