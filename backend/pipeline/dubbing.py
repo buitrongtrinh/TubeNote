@@ -265,7 +265,10 @@ def _merge_background_config(
     from backend.services.dubbing.background import ensure_background_audio
 
     cfg = dict(tts_cfg or {})
-    keep_background = bool(cfg.get("keep_background", True))
+    # Mặc định TẮT nhạc nền (Demucs tách nền tốn thêm vài phút/video) — người
+    # dùng chủ động bật. Regenerate video cũ không đi qua default này: nó đọc
+    # background.enabled từ metadata của chính video đó.
+    keep_background = bool(cfg.get("keep_background", False))
     mix_cfg = CFG.mix
     if not keep_background:
         yield original_audio, mix_cfg.original_volume, mix_cfg.dub_volume_no_background, {
@@ -305,6 +308,7 @@ def list_library() -> list[dict]:
             "video_id": vid,
             "title": m.get("title") or vid,
             "channel": m.get("channel") or "—",
+            "channel_avatar": m.get("channel_avatar", ""),
             "thumbnail": m.get("thumbnail", ""),
             "view_count": m.get("view_count"),
             "duration": m.get("duration"),
@@ -332,6 +336,7 @@ def list_drafts() -> list[dict]:
             "video_id": vid,
             "title": m.get("title") or vid,
             "channel": m.get("channel") or "—",
+            "channel_avatar": m.get("channel_avatar", ""),
             "thumbnail": m.get("thumbnail", ""),
             "view_count": m.get("view_count"),
             "duration": m.get("duration"),
@@ -394,8 +399,11 @@ def load_video(
     ``on_progress(msg)`` báo tiến độ (đặc biệt khi rơi vào Whisper STT — chậm).
     """
     from backend.services.youtube.transcript import fetch_transcript
-    from backend.services.youtube.transcript_yt_dlp import fetch_metadata
-    from backend.services.dubbing.generate_prompts import create_translation_prompts
+    from backend.services.youtube.transcript_yt_dlp import fetch_metadata, ensure_metadata_chapters
+    from backend.services.dubbing.generate_prompts import (
+        build_chapter_translation_prompt,
+        create_translation_prompts,
+    )
     from backend.services.dubbing import run_log
 
     def progress(msg: str):
@@ -428,6 +436,7 @@ def load_video(
         transcript_time = time.perf_counter() - transcript_started
         progress("Lấy thông tin video")
         fetch_metadata(url)
+        ensure_metadata_chapters(url)
         metadata = load_metadata(vid)
 
         if not run_id:
@@ -455,6 +464,7 @@ def load_video(
             batch_size=CFG.translation.api_batch_size,
             max_chars_per_batch=CFG.translation.api_max_chars_per_batch,
         )
+        chapter_prompt = build_chapter_translation_prompt(metadata)
         if created_current_run:
             run_log.update_run(run_id, total_time_sec=time.perf_counter() - started)
         return {
@@ -463,6 +473,7 @@ def load_video(
             "metadata": load_metadata(vid),
             "prompts": prompts,
             "api_prompts": api_prompts,
+            "chapter_prompt": chapter_prompt,
             "translation_batching": {
                 "manual_batch_size": CFG.translation.manual_batch_size,
                 "api_batch_size": CFG.translation.api_batch_size,
@@ -542,6 +553,49 @@ def validate_response(
         for warning in segment.get("normalization", {}).get("warnings", [])
     ]
     return {"ok": True, "error": "", "segments": batch, "warnings": warnings}
+
+
+def validate_chapter_response(vid: str, response: str) -> dict:
+    """Validate translated chapter titles against the source metadata only."""
+    from backend.services.dubbing.generate_prompts import parse_chapter_translation_response
+
+    metadata = load_metadata(extract_video_id(vid))
+    if not metadata:
+        return {"ok": False, "error": "Không tìm thấy metadata video.", "titles": []}
+    return parse_chapter_translation_response(response, metadata)
+
+
+def chapter_translation_prompt(vid: str) -> str | None:
+    """Return the current chapter prompt for restoring a pre-feature draft."""
+    from backend.services.dubbing.generate_prompts import build_chapter_translation_prompt
+
+    return build_chapter_translation_prompt(load_metadata(extract_video_id(vid)))
+
+
+def _chapter_titles_for_dubbing(metadata: dict, titles: list[str] | None) -> list[str]:
+    chapters = metadata.get("chapters") if isinstance(metadata.get("chapters"), list) else []
+    if not chapters:
+        return []
+    values = titles
+    if values is None:
+        values = [chapter.get("title_vi") if isinstance(chapter, dict) else None for chapter in chapters]
+    if not isinstance(values, list) or len(values) != len(chapters):
+        raise ValueError("Video có phân cảnh; cần xác nhận đủ bản dịch tiêu đề trước khi dubbing.")
+    clean = [" ".join(str(value or "").split()) for value in values]
+    if any(not value for value in clean):
+        raise ValueError("Video có phân cảnh; cần xác nhận đủ bản dịch tiêu đề trước khi dubbing.")
+    return clean
+
+
+def _apply_chapter_titles(metadata: dict, titles: list[str]) -> None:
+    chapters = metadata.get("chapters") if isinstance(metadata.get("chapters"), list) else []
+    if not chapters:
+        return
+    if len(chapters) != len(titles):
+        raise ValueError("Số tiêu đề phân cảnh không khớp metadata video.")
+    for chapter, title in zip(chapters, titles):
+        if isinstance(chapter, dict):
+            chapter["title_vi"] = title
 
 
 def _extract_llm_text(response: object) -> str:
@@ -683,7 +737,8 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
     engine = str(cfg.get("engine") or "supertonic")
     if engine not in TTS_POLICIES:
         raise ValueError(f"TTS engine không hợp lệ: {engine!r}")
-    keep_background = bool(cfg.get("keep_background", True))
+    # Mặc định TẮT nhạc nền — đồng bộ với DEFAULT_TTS_CONFIG phía frontend.
+    keep_background = bool(cfg.get("keep_background", False))
 
     if engine == "supertonic":
         model = str(cfg.get("model") or tts_model or CFG.tts.default_model)
@@ -1302,6 +1357,7 @@ def run_dubbing(
     segments: list[str],
     tts: dict | None = None,
     tts_model: str | None = None,
+    chapter_titles: list[str] | None = None,
     report: Optional[Callable[[int, str], None]] = None,
 ) -> str:
     """Chạy toàn bộ: lưu bản dịch → TTS → trộn video. Trả về video_id.
@@ -1314,7 +1370,7 @@ def run_dubbing(
     if not lock.acquire(blocking=False):
         raise ValueError("Video này đang được lồng tiếng; đợi lần chạy trước hoàn tất.")
     try:
-        return _run_dubbing_impl(url, segments, tts, tts_model, report)
+        return _run_dubbing_impl(url, segments, tts, tts_model, chapter_titles, report)
     finally:
         lock.release()
 
@@ -1324,6 +1380,7 @@ def _run_dubbing_impl(
     segments: list[str],
     tts: dict | None = None,
     tts_model: str | None = None,
+    chapter_titles: list[str] | None = None,
     report: Optional[Callable[[int, str], None]] = None,
 ) -> str:
     """Thân dubbing thực tế. Phân bổ %: chuẩn bị 5% · TTS 5→80% · trộn 80→100%."""
@@ -1340,6 +1397,8 @@ def _run_dubbing_impl(
             report(percent, stage)
 
     vid = extract_video_id(url)
+    metadata = load_metadata(vid)
+    confirmed_chapter_titles = _chapter_titles_for_dubbing(metadata, chapter_titles)
     # Prefetch video (nặng nhất, 1080p) song song với TTS. Audio để luồng chính
     # tự tải vì OmniVoice cần nó sớm để trích giọng — tránh tải trùng cùng file.
     # Lỗi ở đây được nuốt: bước mux gọi download_video lại (skip_if_exists) và
@@ -1360,7 +1419,6 @@ def _run_dubbing_impl(
     subtitle_file = engine_subtitles_path(vid, tts_cfg["engine"])
     subtitle_file.parent.mkdir(parents=True, exist_ok=True)
     original_audio = None
-    metadata = load_metadata(vid)
     run_id = metadata.get("latest_run_id")
     if not run_log.has_run(run_id):
         run_id = run_log.create_run(
@@ -1496,6 +1554,7 @@ def _run_dubbing_impl(
         error=None,
     )
     metadata = load_metadata(vid)
+    _apply_chapter_titles(metadata, confirmed_chapter_titles)
     metadata["dubbing"] = _latest_dubbing_metadata(
         tts_cfg=tts_cfg,
         raw_tts=raw_tts,

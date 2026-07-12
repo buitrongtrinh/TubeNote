@@ -30,3 +30,21 @@ def build_vtt(segments: list[dict], field: str, prefer_tts_timing: bool = False)
         lines.append(text)
         lines.append("")
     return "\n".join(lines)
+
+
+def build_chapter_vtt(chapters: list[dict]) -> str:
+    """Build a WebVTT chapters track from normalized metadata."""
+    lines = ["WEBVTT", ""]
+    for chapter in chapters:
+        title = " ".join(str(chapter.get("title_vi") or "").split())
+        try:
+            start = float(chapter.get("start"))
+            end = float(chapter.get("end"))
+        except (TypeError, ValueError):
+            continue
+        if not title or end <= start:
+            continue
+        lines.append(f"{_ts(start)} --> {_ts(end)}")
+        lines.append(title)
+        lines.append("")
+    return "\n".join(lines)

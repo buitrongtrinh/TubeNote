@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 
 from backend.pipeline import dubbing
 from backend.services.youtube.utils import load_json
-from backend.services.video.vtt import build_vtt
+from backend.services.video.vtt import build_chapter_vtt, build_vtt
 from backend.services.video.timing import display_range
 
 router = APIRouter(prefix="/api", tags=["video"])
@@ -77,6 +77,20 @@ def subtitles(vid: str, lang: str):
         s["disp"] = _seg_text(s, lang)
     return Response(
         build_vtt(segs, "disp", prefer_tts_timing=(lang == "vi")),
+        media_type="text/vtt",
+        headers=NO_CACHE_HEADERS,
+    )
+
+
+@router.get("/video/{vid}/chapters")
+def chapters(vid: str):
+    """Translated chapter titles as WebVTT for Vidstack's chapter track."""
+    metadata = dubbing.load_metadata(vid)
+    entries = metadata.get("chapters") if isinstance(metadata.get("chapters"), list) else []
+    if not entries or not all(isinstance(item, dict) and str(item.get("title_vi") or "").strip() for item in entries):
+        raise HTTPException(404, "Video chưa có phân cảnh đã dịch")
+    return Response(
+        build_chapter_vtt(entries),
         media_type="text/vtt",
         headers=NO_CACHE_HEADERS,
     )

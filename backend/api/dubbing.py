@@ -43,6 +43,10 @@ class ValidateReq(BaseModel):
     budgets: list[int] = Field(default_factory=list)
 
 
+class ChapterValidateReq(BaseModel):
+    response: str = ""
+
+
 class TranslateReq(BaseModel):
     prompt_index: int
     prompt: str = Field(min_length=1)
@@ -56,6 +60,7 @@ class DubReq(BaseModel):
     segments: list[dict]
     tts: dict | None = None
     tts_model: str | None = None
+    chapter_titles: list[str] | None = None
 
 
 class RegenerateSegmentReq(BaseModel):
@@ -124,6 +129,17 @@ def validate(req: ValidateReq):
         engine=req.engine,
         budgets=req.budgets,
     )
+
+
+@router.post("/video/{vid}/chapters/validate")
+def validate_chapters(vid: str, req: ChapterValidateReq):
+    """Validate a separate chapter-title translation before the dubbing job."""
+    return dubbing.validate_chapter_response(vid, req.response)
+
+
+@router.get("/video/{vid}/chapters/prompt")
+def chapter_prompt(vid: str):
+    return {"prompt": dubbing.chapter_translation_prompt(vid)}
 
 
 @router.get("/translation/models")
@@ -195,6 +211,7 @@ def dub(req: DubReq, bg: BackgroundTasks):
         jobs.run, job_id,
         lambda update: dubbing.run_dubbing(
             req.url, req.segments, tts=req.tts, tts_model=req.tts_model,
+            chapter_titles=req.chapter_titles,
             report=lambda p, s: update(progress=p, stage=s),
         ),
     )
