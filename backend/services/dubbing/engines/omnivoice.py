@@ -17,14 +17,45 @@ _MODEL_CACHE: dict[tuple[str, str], object] = {}
 
 
 def release_omnivoice_models() -> None:
-    """Release cached OmniVoice weights before another GPU model is loaded."""
+    """Release cached OmniVoice weights before another GPU model is loaded.
+
+    Chỉ ``_MODEL_CACHE.clear()`` + ``empty_cache()`` KHÔNG đủ: OmniVoice nạp
+    ``audio_tokenizer`` (HiggsAudioV2Tokenizer, ~800MB codec) qua HF
+    ``from_pretrained(device_map=...)``, mà accelerate gắn hook giữ tham chiếu
+    tới module/weights — nên dù bỏ model khỏi cache và gc, ~800MB trọng số
+    codec vẫn KẸT trên GPU, empty_cache() không đòi lại được (không phải cache
+    rảnh). Tích lũy ~800MB mỗi lần dub (release→reload), vài video là OOM ngay
+    lúc Whisper nạp ("CUDA failed with error out of memory", asr_time_sec=NaN).
+    Sửa: ``model.to("cpu")`` di chuyển tham số TẠI CHỖ về CPU trước khi drop —
+    giải phóng VRAM kể cả khi hook còn giữ ref Python (đã đo: về ~9MB sạch,
+    không còn tích lũy).
+    """
     import gc
+
+    try:
+        import torch
+    except Exception:
+        torch = None
+
+    for model in list(_MODEL_CACHE.values()):
+        try:
+            model.to("cpu")
+        except Exception:
+            pass
+        # audio_tokenizer/feature_extractor là submodule nhưng load riêng bằng
+        # device_map — ép về CPU thêm lần nữa cho chắc (hook accelerate).
+        for attr in ("audio_tokenizer", "feature_extractor"):
+            sub = getattr(model, attr, None)
+            if sub is not None and hasattr(sub, "to"):
+                try:
+                    sub.to("cpu")
+                except Exception:
+                    pass
 
     _MODEL_CACHE.clear()
     gc.collect()
     try:
-        import torch
-        if torch.cuda.is_available():
+        if torch is not None and torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
     except Exception:
@@ -218,6 +249,8 @@ def synthesize_omnivoice(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> list[dict]:
     """Generate a full dubbed WAV aligned to source segment starts."""
+    import gc
+
     import numpy as np
     import soundfile as sf
     import torch
@@ -265,25 +298,48 @@ def synthesize_omnivoice(
             raise ValueError(f"Không tìm thấy reference audio cho OmniVoice: {ref_audio}")
     clone_prompt = None
     if voice_mode == "clone" and ref_audio:
-        clone_prompt = model.create_voice_clone_prompt(
-            ref_audio=ref_audio,
-            ref_text=ref_text,
-            preprocess_prompt=bool(config.get("preprocess_prompt", True)),
-        )
+        # create_voice_clone_prompt() KHÔNG có @torch.inference_mode() trong
+        # thư viện (chỉ generate() có) — nó gọi audio_tokenizer.encode() là 1
+        # forward pass thật, chạy ngoài guard này sẽ build/giữ autograd graph
+        # cho ref_audio_tokens suốt đời clone_prompt, empty_cache() ở cuối
+        # hàm không giải phóng được vì graph vẫn còn tham chiếu (không phải
+        # cache rảnh). Đây là nguồn leak thật khi dùng giọng clone (vd "Giọng
+        # gốc video"), độc lập với generate() — đã tự có inference_mode().
+        with torch.inference_mode():
+            clone_prompt = model.create_voice_clone_prompt(
+                ref_audio=ref_audio,
+                ref_text=ref_text,
+                preprocess_prompt=bool(config.get("preprocess_prompt", True)),
+            )
 
     items = [(idx, item) for idx, item in enumerate(data) if (item.get("text_tts") or "").strip()]
+    # Sort theo generation_duration TĂNG DẦN trước khi chia batch. Trong thư
+    # viện, _generate_iterative() cấp tensor cho CẢ BATCH theo item DÀI NHẤT
+    # (torch.full(..., max(task.target_lens)), xem omnivoice/models/omnivoice.py)
+    # — câu ngắn gộp chung batch với câu dài bị "kéo giãn" tính toán lên bằng
+    # câu dài nhất ở MỌI bước diffusion, lãng phí compute (đã thấy thực tế:
+    # batch=4 chậm hơn batch=1 trên cùng video vì độ dài câu lệch nhau 0.4-7.7s).
+    # Sort trước để mỗi batch gồm các câu gần độ dài nhau nhất có thể — cùng
+    # cách chính omnivoice-infer-batch CLI cluster theo duration để giảm pad.
+    # Thứ tự xử lý không ảnh hưởng kết quả: mỗi item tự ghi vào full_audio theo
+    # "start" tuyệt đối, và timings tra lại data[idx] qua source_indices —
+    # không phụ thuộc thứ tự xử lý.
+    items_sorted = sorted(
+        (
+            (idx, item, _generation_slot_seconds(
+                data, idx, alpha=generation_delta_alpha, min_delta=generation_delta_min,
+            ))
+            for idx, item in items
+        ),
+        key=lambda entry: entry[2],
+    )
     done = 0
     pos = 0
-    while pos < len(items):
-        batch = items[pos:pos + batch_size]
-        texts = [(item.get("text_tts") or "").strip() for _, item in batch]
-        target_durations = [_slot_seconds(data, idx) for idx, _ in batch]
-        generation_durations = [
-            _generation_slot_seconds(
-                data, idx, alpha=generation_delta_alpha, min_delta=generation_delta_min,
-            )
-            for idx, _ in batch
-        ]
+    while pos < len(items_sorted):
+        batch = items_sorted[pos:pos + batch_size]
+        texts = [(item.get("text_tts") or "").strip() for _, item, _ in batch]
+        target_durations = [_slot_seconds(data, idx) for idx, _, _ in batch]
+        generation_durations = [duration for _, _, duration in batch]
         kwargs = {
             "text": texts,
             "language": [language] * len(batch),
@@ -321,10 +377,9 @@ def synthesize_omnivoice(
             continue
         pos += len(batch)
 
-        for (idx, item), target_duration, generation_duration, audio in zip(
+        for (idx, item, generation_duration), target_duration, audio in zip(
             batch,
             target_durations,
-            generation_durations,
             audios,
         ):
             audio = audio.astype(np.float32)
@@ -388,6 +443,12 @@ def synthesize_omnivoice(
     # nhưng trả phần VRAM đệm/tạm (activation, buffer trung gian) về driver —
     # không làm việc này thì process tích lũy dần qua mỗi lần dub, dub cùng 1
     # video vài lần liên tiếp cuối cùng OOM dù batch/độ dài y hệt lần trước.
+    # gc.collect() TRƯỚC empty_cache(): autograd graph (vd từ clone_prompt cũ,
+    # nếu đâu đó còn sót graph reference dạng cycle) cần 1 chu kỳ GC đầy đủ
+    # mới đứt hết reference — refcounting đơn thuần lúc hàm return không đủ,
+    # và empty_cache() chỉ trả lại phần PyTorch coi là "rảnh", chạy trước khi
+    # cycle bị dọn thì coi như không giải phóng được gì.
     if torch.cuda.is_available():
+        gc.collect()
         torch.cuda.empty_cache()
     return timings

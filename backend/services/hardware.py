@@ -103,7 +103,10 @@ def hardware_availability(
                 available = bool(vram and vram >= required)
                 reason = "" if available else _format_requirement("VRAM", required)
         elif device == "cpu":
-            required = asr_cpu_min.get(preset_id)
+            # Preset không nằm trong asr_cpu_by_ram (vd cpu_medium — cố ý loại
+            # khỏi auto đề xuất) vẫn cần ngưỡng riêng, nếu không sẽ bị hiểu
+            # nhầm là "không giới hạn RAM" và không bao giờ bị xám.
+            required = asr_cpu_min.get(preset_id, cfg.asr_cpu_advanced_min_ram_gb.get(preset_id))
             if required is not None and ram is not None and ram < required:
                 available = False
                 reason = _format_requirement("RAM", required)

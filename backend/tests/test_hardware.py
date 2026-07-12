@@ -15,6 +15,7 @@ TEST_CFG = HardwareCfg(
     asr_gpu_by_vram={2.0: "gpu_small", 3.5: "gpu"},
     asr_cpu_by_ram={0.0: "cpu_tiny", 4.0: "cpu_base", 6.0: "cpu"},
     max_auto_threads=16,
+    asr_cpu_advanced_min_ram_gb={"cpu_medium": 6.5},
 )
 
 
@@ -74,6 +75,22 @@ class RecommendSetupTests(unittest.TestCase):
         self.assertEqual(rec["tts_engine"], "omnivoice")
         self.assertEqual(rec["omnivoice_batch_size"], 4)
 
+    def test_three_gpu_tiers_picks_highest_qualifying(self):
+        """asr_gpu_by_vram thật có 3 tier (gpu_small/gpu/gpu_turbo) — xác nhận
+        pick_tier vẫn chọn đúng ngưỡng LỚN NHẤT đạt được, không chỉ dòng đầu."""
+        cfg = HardwareCfg(
+            omnivoice_min_vram_gb=TEST_CFG.omnivoice_min_vram_gb,
+            omnivoice_batch_by_vram=TEST_CFG.omnivoice_batch_by_vram,
+            asr_gpu_by_vram={1.0: "gpu_small", 2.5: "gpu", 3.0: "gpu_turbo"},
+            asr_cpu_by_ram=TEST_CFG.asr_cpu_by_ram,
+            max_auto_threads=16,
+            asr_cpu_advanced_min_ram_gb={},
+        )
+        self.assertEqual(recommend_setup(16, 0.5, 8, cfg=cfg)["asr_preset"], "cpu")
+        self.assertEqual(recommend_setup(16, 1.5, 8, cfg=cfg)["asr_preset"], "gpu_small")
+        self.assertEqual(recommend_setup(16, 2.6, 8, cfg=cfg)["asr_preset"], "gpu")
+        self.assertEqual(recommend_setup(16, 5.6, 8, cfg=cfg)["asr_preset"], "gpu_turbo")
+
     def test_big_gpu_gets_bigger_batch(self):
         rec = recommend_setup(32, 16, 24, cfg=TEST_CFG)
         self.assertEqual(rec["tts_engine"], "omnivoice")
@@ -95,6 +112,7 @@ class RecommendSetupTests(unittest.TestCase):
             asr_gpu_by_vram={2.0: "khong_ton_tai"},
             asr_cpu_by_ram={0.0: "cung_khong"},
             max_auto_threads=16,
+            asr_cpu_advanced_min_ram_gb={},
         )
         rec = recommend_setup(8, 8, 8, cfg=broken)
         self.assertIn(rec["asr_preset"], CFG.whisper.presets)
@@ -124,6 +142,12 @@ class HardwareAvailabilityTests(unittest.TestCase):
         self.assertTrue(availability["asr"]["cpu_tiny"]["available"])
         self.assertFalse(availability["asr"]["cpu_base"]["available"])
         self.assertFalse(availability["asr"]["cpu"]["available"])
+
+    def test_cpu_medium_not_in_auto_table_still_respects_min_ram(self):
+        """cpu_medium cố ý loại khỏi asr_cpu_by_ram (không auto đề xuất) —
+        nhưng vẫn phải bị xám ở RAM thấp, không được coi là "không giới hạn"."""
+        self.assertFalse(hardware_availability(1, 0, cfg=TEST_CFG)["asr"]["cpu_medium"]["available"])
+        self.assertTrue(hardware_availability(8, 0, cfg=TEST_CFG)["asr"]["cpu_medium"]["available"])
 
 
 class HardwareReportTests(unittest.TestCase):

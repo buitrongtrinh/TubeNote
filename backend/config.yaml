@@ -59,7 +59,9 @@ transcript:
 
 cookies:
   # KHÔNG set ở đây để giữ rule "single source of truth" trong .env.
-  # Bật cookies bằng YT_COOKIES_DIR / YT_COOKIES_PATH trong .env.
+  # Khuyến nghị: YT_COOKIES_BROWSER (đọc thẳng từ trình duyệt đang đăng nhập).
+  # dir/single_file chỉ là fallback cho môi trường không có trình duyệt local,
+  # bật bằng YT_COOKIES_DIR / YT_COOKIES_PATH trong .env.
   dir: null
   single_file: null
 
@@ -94,7 +96,12 @@ web_search:
   # Setup: `docker run -d -p 8888:8080 --name searxng searxng/searxng`
   enabled: true
   base_url: http://localhost:8888
-  max_results: 5
+  # SearXNG đã tự xếp hạng tốt nhất trước -- lấy 3 nguồn đầu, ưu tiên chất
+  # lượng/ít nhiễu hơn ưu tiên số lượng (không dùng field "score" của SearXNG
+  # để lọc thêm vì chưa xác nhận được thang đo có ổn định giữa các câu hỏi
+  # không -- xem comment thảo luận trong lịch sử; nếu cần lọc kỹ hơn, phải đo
+  # score thật trước rồi mới quyết ngưỡng).
+  max_results: 3
   # Threshold cho "auto" mode: top RAG score < này → call web.
   # 1.0 = identical, 0.5 = orthogonal (no relation), 0.0 = opposite.
   auto_threshold: 0.55
@@ -120,9 +127,22 @@ whisper:
   # Preset nào tắt word_timestamps sẽ tự rơi về hành vi cũ (dùng nguyên
   # segment.text/start/end). Xem transcript_whisper.py::_split_into_entries.
   sentence_pause_alpha: 0.02   # giây; gap giữa 2 từ >= ngưỡng này -> cắt câu mới
-  sentence_max_words: 20        # giới hạn cứng số từ/câu khi không có pause/dấu phẩy để cắt; đặt 0 để tắt (không cắt cứng theo số từ)
+  sentence_max_words: 20        # NGƯỠNG kích hoạt cắt mềm: câu dài hơn sẽ được cắt tại dấu phẩy/liên từ nếu có; KHÔNG cắt cứng theo đếm từ (không có điểm cắt tự nhiên -> giữ nguyên câu dài). Đặt 0 để tắt hẳn tầng này.
   sentence_min_words: 2        # câu tách ra ít hơn ngần này từ (vd 1 từ đứng riêng) sẽ tự gộp vào câu liền kề gần hơn về thời gian
   # cpu_threads: 0 = auto theo số core máy (clamp hardware.max_auto_threads).
+  #
+  # batch_size / progressive: đã ĐO THẬT bằng scripts/measure_vram.py
+  # --whisper-sweep trên RTX 4050 (2 audio thật, 268s + 500s). Bật batch thật
+  # (progressive: false -> BatchedInferencePipeline) cho medium.en đạt tốc độ
+  # tốt (+42-60%) NHƯNG khi so khớp theo cửa sổ 50s, phát hiện batched pipeline
+  # (VAD nội bộ) LÀM MẤT THẬT nội dung nói ở một số đoạn — lệch tới 30-67% số
+  # từ trong 1 khung 50s trên audio thứ 2 (không phải re-group vô hại, mà mất
+  # hẳn câu nói). large-v3-turbo hầu như không được lợi gì từ batch (+2-4%
+  # trên cả 2 audio) nên không đáng đánh đổi. Kết luận: KHÔNG bật batch thật
+  # cho preset nào — batch_size giữ 1, progressive giữ true ở mọi preset.
+  # Nếu sau này muốn thử lại, PHẢI re-run sweep + so khớp theo cửa sổ thời
+  # gian (không chỉ so tổng số từ, vì tổng có thể "trông ổn" do bù trừ) trước
+  # khi bật progressive: false cho bất kỳ preset nào.
   presets:
     cpu_tiny:
       label: Whisper - CPU (tiny)
@@ -132,7 +152,7 @@ whisper:
       language: en
       device: cpu
       compute_type: int8
-      batch_size: 4
+      batch_size: 1
       beam_size: 5
       cpu_threads: 0
       num_workers: 2
@@ -146,7 +166,7 @@ whisper:
       language: en
       device: cpu
       compute_type: int8
-      batch_size: 4
+      batch_size: 1
       beam_size: 5
       cpu_threads: 0
       num_workers: 2
@@ -154,13 +174,14 @@ whisper:
       word_timestamps: true
     cpu:
       label: Whisper - CPU
-      description: Tương thích máy không có GPU; small.en + CPU int8.
+      # Đo thật: x3.1 realtime trên máy 16 core.
+      description: Tương thích máy không có GPU.
       engine: faster
       model: small.en
       language: en
       device: cpu
       compute_type: int8
-      batch_size: 4
+      batch_size: 1
       beam_size: 5
       cpu_threads: 0
       num_workers: 2
@@ -174,7 +195,7 @@ whisper:
       language: en
       device: cpu
       compute_type: int8
-      batch_size: 4
+      batch_size: 1
       beam_size: 5
       cpu_threads: 0
       num_workers: 2
@@ -182,25 +203,40 @@ whisper:
       word_timestamps: true
     gpu_small:
       label: Whisper - GPU (small)
-      description: GPU VRAM nhỏ (~2GB); small.en + CUDA float16.
+      description: GPU VRAM nhỏ (~1GB), tốc độ nhanh.
       engine: faster
       model: small.en
       language: en
       device: cuda
       compute_type: float16
-      batch_size: 4
+      batch_size: 1
       beam_size: 5
       progressive: true
       word_timestamps: true
     gpu:
       label: Whisper - GPU
-      description: Chất lượng cao, dùng GPU; medium.en + CUDA float16.
+      description: Chất lượng cao, dùng GPU.
       engine: faster
       model: medium.en
       language: en
       device: cuda
       compute_type: float16
-      batch_size: 8
+      batch_size: 1
+      beam_size: 5
+      progressive: true
+      word_timestamps: true
+    gpu_turbo:
+      label: Whisper - GPU (turbo, khuyến nghị)
+      # Đo thật (RTX 4050): ~2.3GB, x39-43 realtime -- nhanh hơn medium.en dù
+      # VRAM chỉ nhỉnh hơn ~0.3GB. large-v3 full chậm hơn nhiều (x14.6,
+      # ~3.95GB) mà không có bằng chứng chất lượng tốt hơn -- không đưa vào preset.
+      description: Chất lượng cao nhất, nhanh nhất, dùng GPU.
+      engine: faster
+      model: large-v3-turbo
+      language: en
+      device: cuda
+      compute_type: float16
+      batch_size: 1
       beam_size: 5
       progressive: true
       word_timestamps: true
@@ -218,7 +254,7 @@ translation:
   # Model dịch transcript → tiếng Việt segment-by-segment (giữ timestamps)
   model: gemini-2.5-flash-lite
   # Batch thủ công: copy prompt sang ChatGPT. 50 vẫn ổn vì người dùng tự kiểm tra.
-  manual_batch_size: 80
+  manual_batch_size: 100
   # Batch API: nhỏ hơn để giảm lỗi thiếu/thừa dòng khi model trả về.
   api_batch_size: 25
   api_min_batch_size: 5
@@ -229,10 +265,10 @@ translation:
 tts:
   # Supertonic voice/model name. Có thể override default bằng env TTS_MODEL.
   # Thêm voice hợp lệ vào đây để frontend hiện trong dropdown.
-  default_model: M5
+  default_model: M3
   models:
-    - M5
-    - F5
+    - M3
+    - F3
 
   # Tham số tuning riêng cho engine Supertonic (CPU). Trước đây nằm hardcode
   # trong backend/pipeline/dubbing.py::TTS_POLICIES — gom về đây để có 1 nơi
@@ -349,30 +385,67 @@ hardware:
   # Quy tắc tra bảng chung: lấy dòng có ngưỡng LỚN NHẤT mà giá trị máy >= ngưỡng.
 
   # ASR theo VRAM (GB). Không đạt dòng nào (hoặc không GPU) -> rơi về bảng CPU.
+  # ĐÃ ĐO THẬT (nvidia-smi + scripts/measure_vram.py --whisper-sweep, 2 audio
+  # thật 268s/500s, RTX 4050 Laptop):
+  # gpu_small (small.en fp16) = 0.71GB thật -> ngưỡng 1.0GB (~40% dư).
+  # gpu (medium.en fp16) = 1.96GB thật -> ngưỡng 2.5GB (~28% dư).
+  # gpu_turbo (large-v3-turbo fp16) = 2.3GB thật -> ngưỡng 3.0GB (~30% dư).
+  #   Nhanh hơn hẳn medium.en (x39-43rt so với x25-35rt) mà VRAM chỉ nhỉnh
+  #   hơn ~0.3GB -> ưu tiên hơn "gpu" khi đủ VRAM, không phải chỉ để dự phòng.
+  # (Trước đây 2/3.5GB chỉ là đoán, cao hơn thực tế khá nhiều — hạ ngưỡng
+  # giúp máy VRAM nhỏ vẫn được dùng ASR tăng tốc GPU thay vì rớt về CPU.)
   asr_gpu_by_vram:
-    2: gpu_small        # small.en fp16 (~1.5GB VRAM)
-    3.5: gpu            # medium.en fp16 (~3GB VRAM)
-  # ASR CPU theo RAM (GB). Ràng buộc thật của CPU là TỐC ĐỘ chứ không phải
-  # RAM, nên auto đề xuất tối đa small.en; medium.en CPU (rất chậm) chỉ nằm
-  # trong danh sách Nâng cao, không bao giờ được auto đề xuất.
+    1.0: gpu_small
+    2.5: gpu
+    3.0: gpu_turbo
+  # ASR CPU theo RAM (GB) — ước lượng TỔNG RAM máy cần có (không phải riêng
+  # RAM của model). Ràng buộc thật của CPU là TỐC ĐỘ chứ không phải RAM, nên
+  # auto đề xuất tối đa small.en; medium.en CPU (rất chậm, ~240s cho 268s
+  # audio — gần bằng thời lượng thật) chỉ nằm trong Nâng cao, không auto.
+  #
+  # ĐÃ ĐO THẬT: RSS riêng model (tiny/base/small.en int8) lần lượt 1.2/1.3/
+  # 1.7GB — chênh lệch giữa các model NHỎ hơn nhiều so với bước 2GB cũ giả
+  # định. Cộng thêm baseline backend+frontend idle đo thật ~2.0GB + đệm ~1GB
+  # cho OS/trình duyệt (phần này vẫn là ước lượng, tùy máy người dùng thật):
+  # tiny/base ~4.2-4.4GB (gần nhau, không cần cách xa), small.en ~4.7GB.
+  # Xác nhận lại tốc độ tương đối (16 core, audio 268s): tiny x11.9rt, base
+  # x7.4rt, small (cpu mặc định) x3.1rt — vẫn hợp lý để giữ nguyên 3 tier trên.
   asr_cpu_by_ram:
-    0: cpu_tiny         # < 4GB
-    4: cpu_base         # 4-6GB
-    6: cpu              # >= 6GB: small.en int8
+    0: cpu_tiny         # luôn an toàn — mặc định thấp nhất
+    3: cpu_base         # ~3GB (dư so với ~4.3GB ước lượng, an toàn hơn)
+    5: cpu              # ~5GB (dư so với ~4.7GB ước lượng): small.en int8
 
-  # VRAM (GB) tối thiểu để đề xuất OmniVoice. 3.5-5GB dùng batch 1 để vẫn thử
-  # được OmniVoice trên GPU nhỏ; nếu load model OOM thì người dùng vẫn cần hạ
-  # về Supertonic CPU.
-  # Hiệu chỉnh theo máy thật: RTX 4050 Laptop 5.6GB chạy OmniVoice batch 4 ổn.
-  omnivoice_min_vram_gb: 3.5
+  # cpu_medium (medium.en CPU) CỐ Ý không nằm trong bảng trên (không bao giờ
+  # auto đề xuất — quá chậm, ~240s cho audio 268s). Nhưng thiếu preset_id ở
+  # đó khiến hardware_availability() (xám option trong "Nâng cao") hiểu nhầm
+  # là "không giới hạn RAM" — bug thật: RAM=1GB vẫn cho chọn cpu_medium. Cần
+  # ngưỡng riêng ở đây để vẫn xám đúng dù không auto đề xuất.
+  # Đo thật: cpu_medium 3.5GB RSS + baseline app (~2GB) + đệm OS (~1GB) = 6.5GB.
+  asr_cpu_advanced_min_ram_gb:
+    cpu_medium: 6.5
+
+  # VRAM (GB) tối thiểu để đề xuất OmniVoice. Đo thật trên RTX 4050 Laptop:
+  # dub hết 1 video ổn định ở batch=1 với ~2.5GB VRAM khả dụng; đặt 3.0 để
+  # chừa ~500MB đệm (driver/CUDA context/hao hụt khác ngoài lúc đo). Dưới mức
+  # này -> rơi về Supertonic CPU.
+  omnivoice_min_vram_gb: 3.0
   # Bảng chọn batch_size OmniVoice theo VRAM khi tts.omnivoice.batch_size = 0.
-  # Ngưỡng chỉ là ước lượng — VRAM thực tế còn tùy độ dài segment; đã có cơ
-  # chế tự giảm nửa batch khi CUDA OOM nên đặt hơi lạc quan cũng an toàn.
+  #
+  # ĐÃ ĐO THẬT trên RTX 4050 Laptop 5.6GB: batch lớn hơn 1 KHÔNG nhanh hơn —
+  # GPU utilization suốt quá trình đã 100% ngay ở batch=1 (không còn "tay
+  # rảnh" để song song hoá), và batch=8 trên data đồng nhất (loại hẳn yếu tố
+  # padding) vẫn chậm hơn 8x tuần tự — gộp batch chỉ tốn thêm, không lợi gì.
+  #
+  # Mọi tier bên dưới ĐANG đặt =1 làm mặc định AN TOÀN, kể cả 12/16GB dù CHƯA
+  # đo thật trên GPU đó — nguyên tắc: không có bằng chứng thì không giả định
+  # có lợi (bảng cũ từng đoán lạc quan 5.6GB->batch 4, sau đo lại thì sai).
+  # GPU mạnh hơn có compute dư thật có thể batch>1 mới có lợi — nhưng phải
+  # ĐO bằng scripts/measure_vram.py trên đúng GPU đó rồi mới nâng số ở đây,
+  # không suy đoán từ tier dưới lên.
   omnivoice_batch_by_vram:
-    3.5: 1
-    5: 4
-    12: 6
-    16: 8
+    3.0: 1
+    12: 1
+    16: 1
   # Trần số thread khi auto theo số core (whisper cpu_threads=0 và
   # supertonic intra_op_threads=0).
   max_auto_threads: 16

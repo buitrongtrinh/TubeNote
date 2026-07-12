@@ -150,6 +150,10 @@ class HardwareCfg:
     asr_gpu_by_vram: Dict[float, str]
     asr_cpu_by_ram: Dict[float, str]
     max_auto_threads: int
+    # RAM tối thiểu cho preset CPU KHÔNG nằm trong asr_cpu_by_ram (không auto
+    # đề xuất, chỉ chọn được qua "Nâng cao") — asr_cpu_by_ram không phủ được
+    # preset_id -> vẫn cần ngưỡng riêng để hardware_availability() xám đúng.
+    asr_cpu_advanced_min_ram_gb: Dict[str, float]
 
 
 @dataclass
@@ -389,6 +393,10 @@ def load() -> AppCfg:
             "asr_cpu_by_ram", str, {0.0: "cpu_tiny", 4.0: "cpu_base", 6.0: "cpu"},
         ),
         max_auto_threads=int(hw_raw.get("max_auto_threads", 16)),
+        asr_cpu_advanced_min_ram_gb={
+            str(k): float(v)
+            for k, v in (hw_raw.get("asr_cpu_advanced_min_ram_gb") or {}).items()
+        } or {"cpu_medium": 6.5},
     )
 
     rag_raw = raw.get("rag", {})
@@ -400,12 +408,19 @@ def load() -> AppCfg:
     )
 
     emb_raw = raw.get("embedding", {})
+    # Env override cho container/máy mới: yaml đặt true (máy đã cache model),
+    # set EMBEDDING_LOCAL_FILES_ONLY=0 để cho phép tải model ở lần chạy đầu.
+    local_only_env = os.getenv("EMBEDDING_LOCAL_FILES_ONLY", "").strip().lower()
     embedding = EmbeddingCfg(
         provider=os.getenv("EMBEDDING_PROVIDER") or emb_raw.get("provider", "huggingface"),
         model=os.getenv("EMBEDDING_MODEL") or emb_raw.get("model", "BAAI/bge-m3"),
         device=os.getenv("EMBEDDING_DEVICE") or emb_raw.get("device", "auto"),
         normalize=bool(emb_raw.get("normalize", True)),
-        local_files_only=bool(emb_raw.get("local_files_only", False)),
+        local_files_only=(
+            local_only_env in ("1", "true", "yes")
+            if local_only_env
+            else bool(emb_raw.get("local_files_only", False))
+        ),
     )
 
     ws_raw = raw.get("web_search", {})

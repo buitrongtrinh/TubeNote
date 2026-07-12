@@ -76,8 +76,12 @@ using three signals (`backend/services/youtube/transcript_whisper.py`):
 ```text
 1. pause: gap between two words >= sentence_pause_alpha (default 0.02s)
 2. punctuation: previous word ends a sentence (. ! ? …)
-3. word cap: sentence_max_words hard limit, preferring cuts at commas or
-   conjunctions near the middle (0 disables the cap entirely)
+3. length trigger: runs longer than sentence_max_words are soft-split at the
+   most balanced comma — or, failing that, right BEFORE a conjunction
+   (and/but/because/...) so it starts the second half. There is no hard
+   word-count cut: a run with no natural cut point stays whole, because a
+   long-but-complete sentence translates and reads better than two clipped
+   fragments (0 disables this tier entirely)
 ```
 
 Fragments shorter than `sentence_min_words` are merged into the closer
@@ -105,16 +109,29 @@ full parameter set using tier tables in `backend/config.yaml` (section
 `hardware`) — recalibrate by editing the yaml, no code changes:
 
 ```text
-asr_gpu_by_vram    VRAM >= 2GB -> gpu_small (small.en fp16)
-                   VRAM >= 3.5GB -> gpu (medium.en fp16)
-asr_cpu_by_ram     RAM < 4GB -> cpu_tiny, 4-6GB -> cpu_base, >= 6GB -> cpu
+asr_gpu_by_vram    VRAM >= 1.0GB -> gpu_small (small.en fp16, ~0.71GB measured)
+                   VRAM >= 2.5GB -> gpu (medium.en fp16, ~1.96GB measured)
+                   VRAM >= 3.0GB -> gpu_turbo (large-v3-turbo fp16, ~2.3GB
+                                    measured, faster AND better quality than
+                                    gpu at nearly the same VRAM cost)
+asr_cpu_by_ram     RAM < 3GB -> cpu_tiny, 3-5GB -> cpu_base, >= 5GB -> cpu
                    (CPU is speed-bound, not RAM-bound, so the auto pick caps
                    at small.en; cpu_medium exists but is advanced-only)
-omnivoice_min_vram_gb   VRAM >= 5GB -> OmniVoice, else Supertonic
-omnivoice_batch_by_vram batch 4 at 5GB, 6 at 12GB, 8 at 16GB
+omnivoice_min_vram_gb   VRAM >= 3.0GB -> OmniVoice, else Supertonic
+omnivoice_batch_by_vram batch 1 at every measured tier — batching didn't show
+                        a real speed benefit (GPU already saturated at batch=1)
 max_auto_threads   whisper cpu_threads / supertonic intra_op threads = cores,
                    clamped to this cap (0 in presets/config = auto)
 ```
+
+Whisper `batch_size`/`progressive` in each preset: `progressive: false` would
+route through faster-whisper's `BatchedInferencePipeline` for real batched
+inference, but real measurement (`scripts/measure_vram.py --whisper-sweep` on
+2 real audio files) found its internal VAD chunking **silently drops spoken
+content** in some time windows (up to 30-67% of words missing in a 50s window
+on one test audio) — not just different segmentation. All presets keep
+`progressive: true` (no real batching) until this is fixed upstream or a safer
+sweep methodology is found; `batch_size` in the yaml is currently inert.
 
 Changing RAM/VRAM re-applies the recommendation (ASR preset, TTS engine, and
 an OmniVoice `batch_size` carried in the dub payload so a manually entered
@@ -127,6 +144,8 @@ To calibrate the tables with real measurements on your machine:
 ```bash
 python scripts/measure_vram.py --omnivoice --batch 4 --num-step 32
 python scripts/measure_vram.py --whisper gpu --audio data/audio/<id>.mp3
+python scripts/measure_vram.py --whisper-sweep --models small.en,medium.en,large-v3-turbo \
+  --batches 1,4,8,16 --device cuda --audio data/audio/<id>.mp3
 ```
 
 ## ASR Presets
@@ -142,9 +161,15 @@ CPU preset:
   device: cpu
   compute_type: int8
 
-GPU preset:
+GPU preset (default "gpu"):
   engine: faster-whisper
   model: medium.en
+  device: cuda
+  compute_type: float16
+
+GPU preset (best, auto-picked when VRAM >= 3.0GB, "gpu_turbo"):
+  engine: faster-whisper
+  model: large-v3-turbo
   device: cuda
   compute_type: float16
 ```
