@@ -1,6 +1,8 @@
 """Route cho RAG hỏi đáp trên video."""
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -56,6 +58,9 @@ class RagAskRequest(BaseModel):
     summary: str = ""
     provider: str = "deepseek"
     model: str = "deepseek-v4-flash"
+    # "off": không search web. "auto": chỉ search khi RAG yếu (top score dưới
+    # hardware.web_search.auto_threshold). "always": search web mọi câu hỏi.
+    web_mode: Literal["off", "auto", "always"] = "off"
 
 
 def _history_messages(items: list[RagHistoryMessage]) -> list[BaseMessage]:
@@ -83,6 +88,15 @@ def _source_payload(doc) -> dict:
     }
 
 
+def _web_source_payload(result) -> dict:
+    return {
+        "title": result.title,
+        "url": result.url,
+        "domain": result.domain,
+        "snippet": result.snippet,
+    }
+
+
 @router.post("/video/{vid}/ask")
 def ask_video(vid: str, req: RagAskRequest):
     try:
@@ -97,11 +111,13 @@ def ask_video(vid: str, req: RagAskRequest):
             question=question,
             history=_history_messages(req.history),
             video_summary=req.summary.strip() or (cached_summary or {}).get("summary", ""),
-            web_mode="off",
+            web_mode=req.web_mode,
         )
         return {
             "answer": result.answer,
             "sources": [_source_payload(doc) for doc in result.chunks_used],
+            "web_sources": [_web_source_payload(item) for item in result.web_results],
+            "web_triggered_by": result.web_triggered_by,
             "top_rag_score": result.top_rag_score,
             "cache_usage": result.cache_usage,
         }

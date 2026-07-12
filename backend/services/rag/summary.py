@@ -24,7 +24,7 @@ Yêu cầu:
 - Trả lời bằng tiếng Việt.
 - Chỉ dựa trên transcript được cung cấp.
 - Không bịa chi tiết ngoài video.
-- Output là plain text, không Markdown đậm, không heading Markdown.
+- UI render Markdown, được dùng **bold**; KHÔNG dùng heading ('#'), bảng, code fence (```).
 - Viết 1 đoạn tổng quan ngắn, sau đó 3-5 ý chính.
 - Mỗi ý chính bắt đầu bằng "- ". Không dùng bullet "*".
 - Giữ nguyên tên riêng, tên sản phẩm, tên dự án tiếng Anh như transcript nếu không chắc cách viết.

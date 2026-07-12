@@ -50,8 +50,8 @@ SYSTEM_PROMPT = (
     "- Cả video lẫn web đều thiếu → 'Tôi không có thông tin về...'. KHÔNG bịa.\n"
     "- Trả lời súc tích, đi thẳng vấn đề.\n\n"
     "QUY TẮC FORMAT BẮT BUỘC:\n"
-    "- Output là plain text vì UI không render Markdown.\n"
-    "- Không dùng Markdown: không **bold**, không heading '#', không bảng, không code fence.\n"
+    "- UI render Markdown, được dùng **bold**, `code` inline, và gạch đầu dòng '- '.\n"
+    "- KHÔNG dùng heading ('#'), bảng, code fence (```), vì panel chat hẹp, các khối đó dễ vỡ layout.\n"
     "- Không dùng LaTeX như \\( ... \\); viết công thức dạng plain text, ví dụ f(x) = wx + b.\n"
     "- Không nhúng citation kiểu '(theo video, [02:10-03:35])' trong câu trả lời; UI sẽ hiển thị nguồn riêng.\n"
     "- Nếu cần liệt kê, dùng tối đa 4 gạch đầu dòng ngắn bằng '- '.\n"
@@ -94,9 +94,9 @@ class QAPipeline:
         progress = on_progress or _noop
 
         # ── RAG retrieval (with scores cho heuristic auto-mode) ──────────────
-        progress("🔍 Đang search chunks liên quan trong vector store…")
+        progress("Đang search chunks liên quan trong vector store…")
         docs, top_score = self._retrieve_with_scores(video_id, question)
-        progress(f"📚 Lấy được {len(docs)} chunks (top score: {top_score:.3f})")
+        progress(f"Lấy được {len(docs)} chunks (top score: {top_score:.3f})")
 
         # ── Web search decision ───────────────────────────────────────────────
         web_results: List[WebResult] = []
@@ -110,17 +110,17 @@ class QAPipeline:
         if should_search:
             web_triggered = web_mode
             reason = "luôn bật" if web_mode == "always" else f"top score {top_score:.2f} < {CFG.web_search.auto_threshold}"
-            progress(f"🌐 Đang search web (SearXNG) — lý do: {reason}…")
+            progress(f"Đang search web (SearXNG) — lý do: {reason}…")
             try:
                 web_results = web_search(question)
-                progress(f"✅ Web search OK ({len(web_results)} kết quả)")
+                progress(f"Web search OK ({len(web_results)} kết quả)")
             except SearXNGError as e:
-                progress(f"⚠️ Web search fail: {e} — tiếp tục chỉ với RAG")
+                progress(f"Web search fail: {e} — tiếp tục chỉ với RAG")
 
         # ── Build messages ───────────────────────────────────────────────────
         messages = self._build_messages(question, docs, web_results, history, video_summary)
 
-        progress("🤖 Đang gọi LLM trả lời…")
+        progress("Đang gọi LLM trả lời…")
         response = self.llm.invoke(messages)
         answer = self._clean_answer(self._extract_text(response))
         cache_usage = self._extract_cache_usage(response)

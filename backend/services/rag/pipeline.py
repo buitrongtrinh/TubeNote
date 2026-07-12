@@ -113,19 +113,19 @@ def ingest(url: str, on_progress: Optional[ProgressCallback] = None) -> dict:
     video_id = extract_video_id(url)
 
     if is_indexed(video_id):
-        progress(f"✅ Video `{video_id}` đã indexed sẵn — dùng cache")
+        progress(f"Video `{video_id}` đã indexed sẵn — dùng cache")
         return {"video_id": video_id, "indexed": False, "chunks": 0}
 
     trans = fetch_transcript(url, languages=languages, on_progress=progress)
     if trans is None:
         raise RuntimeError("Không lấy được transcript bằng cả yt-dlp lẫn Whisper.")
-    progress(f"📝 Transcript OK ({len(trans.segments)} segments)")
+    progress(f"Transcript OK ({len(trans.segments)} segments)")
 
-    progress("✂️ Đang split text thành chunks…")
+    progress("Đang split text thành chunks…")
     docs = chunk_text(trans.full_text)
-    progress(f"📊 Đang embed + store {len(docs)} chunks vào Chroma…")
+    progress(f"Đang embed + store {len(docs)} chunks vào Chroma…")
     store = get_vector_store(video_id)
     store.add_documents(docs)
-    progress(f"✅ Indexed {len(docs)} chunks cho video `{video_id}`")
+    progress(f"Indexed {len(docs)} chunks cho video `{video_id}`")
 
     return {"video_id": video_id, "indexed": True, "chunks": len(docs)}
