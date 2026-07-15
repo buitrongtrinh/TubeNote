@@ -45,6 +45,7 @@ export const api = {
     url, segments, tts, chapter_titles,
   }),
   dubStatus: (jobId) => jget(`/api/dub/${jobId}`),
+  cancelDub: (jobId) => jpost(`/api/dub/${jobId}/cancel`, {}),
   regenerateSegment: (vid, segmentIndex, text_vi, pronunciation_map = {}, num_step = 48) =>
     jpost(`/api/video/${vid}/segments/${segmentIndex}/regenerate`, {
       text_vi, pronunciation_map, num_step,

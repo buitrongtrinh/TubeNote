@@ -661,6 +661,7 @@ textarea {
 
 .tag-ok { color: var(--ok); font-size: 0.82rem; font-weight: 700; }
 .tag-fail { color: var(--fail); font-size: 0.86rem; font-weight: 600; }
+.tag-warn { color: var(--warn); font-size: 0.86rem; font-weight: 600; }
 .tag-wait { color: var(--muted); font-size: 0.82rem; font-weight: 600; }
 
 .meta-box {
@@ -686,10 +687,16 @@ textarea {
 }
 
 .section-head {
+  /* Ghim đỉnh, không center theo chiều dọc: cột phải (chọn chế độ dịch) đổi
+     chiều cao giữa 2 mode (API thêm hàng provider/model/nút dịch) -> center
+     sẽ kéo tiêu đề "Dịch nội dung" nhảy lên xuống theo mỗi lần đổi mode. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   margin: 24px 0 12px;
 }
+
+.translation-tools { margin-top: 2px; }
 
 .section-head h2 {
   font-size: 1.1rem;
@@ -738,11 +745,15 @@ textarea {
 }
 
 .translation-api-controls {
-  display: grid;
-  grid-template-columns: minmax(110px, 140px) minmax(150px, 220px) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 8px;
+  margin-top: 10px;
 }
+
+.translation-api-controls .tts-select:nth-child(1) { width: 140px; }
+.translation-api-controls .tts-select:nth-child(2) { width: 190px; }
 
 .translation-api-controls .tts-select {
   min-width: 0;
@@ -782,12 +793,36 @@ textarea {
   font-weight: 700;
 }
 
+/* Card phân cảnh có thêm tiêu đề "Phân cảnh · N mục" mà card prompt thường
+   không có -> tiêu đề xuống hàng riêng, các nút hành động xuống hàng dưới
+   để không bị dồn chung 1 hàng với prompt-end như .prompt-main mặc định. */
+.chapter-prompt-card .prompt-main {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* .prompt-card căn "P" theo align-items:center của cả card (đúng cho card
+   prompt thường, 1 hàng) -> với card phân cảnh 2 hàng thì bị lệch lửng lơ
+   giữa 2 hàng. Ghim theo hàng tiêu đề (chapter-prompt-heading cao 36px) cho
+   khớp mắt đọc, giống số thứ tự của card prompt thường. */
+.chapter-prompt-card .prompt-no {
+  align-self: start;
+  margin-top: 4px;
+}
+
 .chapter-prompt-heading {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
   min-height: 36px;
-  padding: 0 4px 0 0;
+}
+
+.chapter-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chapter-prompt-heading strong {
@@ -905,46 +940,63 @@ textarea {
   background: var(--accent-fill-hover);
 }
 
-.prompt-workflow {
-  display: flex;
-  flex-direction: column;
-}
-
-.prompt-workflow > .tts-panel { order: 1; }
-.prompt-workflow > .section-head { order: 2; }
-.prompt-workflow > .prompt-list { order: 3; }
-.prompt-workflow > .publish-bar { display: contents; }
-
-.prompt-workflow .tts-panel {
-  margin: 0 0 18px;
-  padding: 14px;
-}
-
-.prompt-workflow .publish-bar > button {
-  order: 4;
+/* Nút "Xác nhận" chung cuối tab 2: kiểm tra toàn bộ prompt + phân cảnh một
+   lượt, đạt hết thì tự sang tab Dubbing. */
+.validate-bar {
   margin-top: 18px;
-  /* Dính đáy viewport khi cuộn danh sách prompt dài — không phải cuộn tới
-     tận cùng trang mới bấm được. Vòng halo màu nền tách nút khỏi nội dung
-     đang trôi phía dưới. */
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  display: grid;
+  gap: 10px;
+  /* Dính đáy viewport khi danh sách prompt dài — không phải cuộn tới tận cùng
+     mới bấm được. Vòng halo màu nền tách bar khỏi nội dung trôi phía dưới. */
   position: sticky;
   bottom: 14px;
   z-index: 5;
   box-shadow:
     0 0 0 6px color-mix(in srgb, var(--bg) 82%, transparent),
-    0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+    var(--shadow-sm);
 }
 
-.prompt-workflow .publish-bar > .background-toggle {
-  order: 4;
-  margin-top: 18px;
+.validate-bar > button { width: 100%; }
+
+.validate-bar .validate-hint {
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
-.prompt-workflow .publish-bar > .background-toggle + button {
-  margin-top: 10px;
+/* Tab "Dubbing": recap video + trạng thái bản dịch + cấu hình giọng + nút REC.
+   Nội dung tab ngắn (danh sách prompt nằm ở tab 2) nên không cần sticky nút
+   như thời mọi thứ chung một trang cuộn dài. */
+.dub-summary {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
-.prompt-workflow .publish-bar > .dub-progress,
-.prompt-workflow .publish-bar > .dub-stage-wait { order: 5; }
+.dub-summary b { color: var(--text); }
+
+.dub-summary-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prompt-workflow .tts-panel {
+  margin: 18px 0 0;
+  padding: 14px;
+}
+
+.prompt-workflow .publish-bar > .background-toggle { margin-bottom: 12px; }
 
 .tts-panel {
   display: grid;
@@ -1176,15 +1228,13 @@ textarea {
   justify-content: flex-start;
 }
 
+/* Badge trên nút "Nội dung": chỉ còn đếm lỗi — số cảnh báo đã có tag-warn
+   ở góc card, không lặp lại ở đây. */
 .content-preview .preview-toggle b {
   margin-left: auto;
-  color: var(--warn);
+  color: var(--fail);
   font-size: 12px;
   font-weight: 600;
-}
-
-.content-preview .preview-toggle b.fail {
-  color: var(--fail);
 }
 
 .tts-text-list {
@@ -1213,6 +1263,15 @@ textarea {
 .tts-text-row.has-error > span,
 .tts-text-row.has-error code {
   color: var(--fail);
+}
+
+.tts-text-row.has-warning {
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface-2));
+}
+
+.tts-text-row.has-warning > span {
+  color: var(--warn);
 }
 
 .tts-text-row > span {
@@ -1351,11 +1410,103 @@ textarea {
 
 .dub-progress-label.progress-percent-only { justify-content: flex-end; }
 
+/* Chuỗi ô bước xử lý dubbing (Chuẩn bị / Tổng hợp giọng nói / Trộn video /
+   Hoàn tất) — nối nhau bằng đường kẻ giữa khoảng gap, ô đang chạy "nổi" lên
+   khỏi hàng (dịch lên + viền cam + đổ bóng) để thấy ngay đang ở bước nào. */
+.dub-pipeline { margin-top: 14px; }
+
+.dub-steps {
+  display: flex;
+  gap: 8px;
+}
+
+.dub-step {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.25;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease,
+    color .2s ease, border-color .2s ease;
+}
+
+.dub-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 8px;
+  height: 1px;
+  background: var(--border);
+  transform: translateY(-50%);
+}
+
+.dub-step.done {
+  /* Đậm hơn accent-soft (~10%) để ô đã xong nổi rõ khỏi ô chưa tới (surface-2). */
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text);
+}
+
+.dub-step.done:not(:last-child)::after {
+  background: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.dub-step.active {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 30%, transparent);
+  z-index: 1;
+}
+
+.dub-stage-detail {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.dub-stage-detail .dub-progress-bar { margin-top: 8px; }
+
+/* Nút hủy dubbing — hành động phá (không phải CTA cam): viền đỏ nhạt, chỉ đậm
+   lên khi hover để không tranh chú ý với chuỗi bước đang chạy phía trên. */
+.dub-cancel {
+  margin-top: 14px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--fail) 45%, var(--border));
+  color: var(--fail);
+  font-weight: 700;
+}
+
+.dub-cancel:hover:not(:disabled) {
+  background: var(--fail-soft);
+  border-color: var(--fail);
+}
+
+.dub-cancel:disabled { opacity: 0.6; }
+
 /* Thanh bước bên trái — checklist phiên thu, số mono nối bằng rãnh dọc */
 .create-steps {
   position: sticky;
   top: calc(var(--topbar-h) + 22px);
   display: grid;
+  /* minmax(0,1fr) thay vì auto: .step giờ là <button>, min-content của button
+     bằng cả dòng chữ không xuống dòng -> track auto phình theo, chữ tràn card.
+     Ép track theo bề rộng container để mô tả bước wrap như cũ. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-self: start;
   padding: 16px;
@@ -1367,9 +1518,35 @@ textarea {
   gap: 10px;
   position: relative;
   padding-bottom: 18px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding-left: 0;
+  padding-right: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  min-width: 0;
+  /* UA stylesheet của Chrome đặt nowrap cho <button> -> mô tả bước tràn card. */
+  white-space: normal;
 }
 
+.step > div { min-width: 0; }
+
 .step:last-child { padding-bottom: 0; }
+
+.step:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.step:not(:disabled):hover { background: var(--surface-2); }
+
+.step.active b { color: var(--accent); }
+
+.step.active span {
+  box-shadow: 0 0 0 2px var(--accent) inset;
+  color: var(--accent);
+}
 
 .step::before {
   content: "";
@@ -2470,7 +2647,9 @@ media-player .vds-time-slider .vds-slider-chapter {
   .meta-box { grid-template-columns: 1fr; }
   .translation-tools { justify-items: stretch; }
   .translation-mode-controls { min-width: 0; }
-  .translation-api-controls { grid-template-columns: 1fr; }
+  .translation-api-controls { flex-direction: column; align-items: stretch; }
+  .translation-api-controls .tts-select:nth-child(1),
+  .translation-api-controls .tts-select:nth-child(2) { width: 100%; }
   .provider-actions { justify-content: flex-start; }
   .prompt-card { grid-template-columns: 28px minmax(0, 1fr); }
   .prompt-end { grid-column: 2; justify-content: flex-start; }

@@ -281,6 +281,46 @@ function parseTtsProgress(stage) {
   return { done, total, pct: Math.min(100, Math.round((done / total) * 100)) };
 }
 
+// Mốc % thật mà backend gửi (_run_dubbing_impl): chuẩn bị 0→4, TTS 5→81,
+// trộn video (gồm cả tách nhạc nền nếu bật) 82→99, xong 100.
+const DUB_STEPS = [
+  { key: "prepare", label: "Chuẩn bị" },
+  { key: "tts", label: "Tổng hợp giọng nói" },
+  { key: "merge", label: "Trộn video" },
+  { key: "done", label: "Hoàn tất" },
+];
+
+// Bật "Giữ nhạc nền" thì Demucs tách nhạc nền chạy TRONG mốc 82% (cùng % với
+// "Trộn video"), có thể đứng đó vài phút -> tách riêng 1 ô để không tưởng bị
+// treo. _run_dubbing_impl luôn gửi "Tách nhạc nền..."/"...(cache)" TRƯỚC rồi
+// mới gửi "Tải & trộn video" (đặt sau khi with-block tách nhạc nền xong) ->
+// thứ tự chữ đơn điệu, dùng an toàn để suy ra đã tách xong hay chưa.
+const DUB_STEPS_WITH_BG = [
+  { key: "prepare", label: "Chuẩn bị" },
+  { key: "tts", label: "Tổng hợp giọng nói" },
+  { key: "bg", label: "Tách nhạc nền" },
+  { key: "merge", label: "Trộn video" },
+  { key: "done", label: "Hoàn tất" },
+];
+
+function isBackgroundSeparationStage(stage) {
+  return /Tách nhạc nền|nhạc nền đã tách/i.test(stage || "");
+}
+
+function dubStepIndex(progress, stage, keepBackground) {
+  const p = Math.max(0, Math.min(100, Number(progress) || 0));
+  if (!keepBackground) {
+    if (p >= 100) return 3;
+    if (p >= 82) return 2;
+    if (p >= 5) return 1;
+    return 0;
+  }
+  if (p >= 100) return 4;
+  if (p >= 82) return isBackgroundSeparationStage(stage) ? 2 : 3;
+  if (p >= 5) return 1;
+  return 0;
+}
+
 export default function AddPage() {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -299,9 +339,17 @@ export default function AddPage() {
   const [chapterModalOpen, setChapterModalOpen] = useState(false);
   const [chapterCopied, setChapterCopied] = useState(false);
   const [dubbing, setDubbing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [stage, setStage] = useState("");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  // Tab đang xem trong sidebar "1 Nạp video / 2 Dịch nội dung / 3 Dubbing".
+  // Không khoá cứng theo kiểu checkout — cho bấm qua lại tự do một khi bước
+  // đó đã "mở khoá" (video đã load cho tab 2, có prompt cho tab 3), vì cấu
+  // hình phần cứng ở tab 1 có thể cần chỉnh lại giữa chừng.
+  const [activeTab, setActiveTab] = useState(1);
+  // Nút "Xác nhận" chung của tab 2 đang chạy kiểm tra toàn bộ mục.
+  const [validatingAll, setValidatingAll] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [modalIdx, setModalIdx] = useState(null);
   const [expandedResponses, setExpandedResponses] = useState({});
@@ -377,6 +425,8 @@ export default function AddPage() {
         if (saved.translationBatching && typeof saved.translationBatching === "object") {
           setTranslationBatching({ ...DEFAULT_TRANSLATION_BATCHING, ...saved.translationBatching });
         }
+        // Nháp đã có prompt -> mở lại đúng tab đang làm dở thay vì tab nạp video.
+        if (Array.isArray(saved.prompts) && saved.prompts.length) setActiveTab(2);
 	      }
 	      if (queryUrl) setUrl(queryUrl);
 
@@ -384,6 +434,7 @@ export default function AddPage() {
       if (jobId) {
         setDubJobId(jobId);
         setDubbing(true);
+        setActiveTab(3);
         setStage(saved?.stage || "Đang khôi phục tiến trình dubbing");
         setJobParam(jobId);
         pollDubJob(jobId);
@@ -726,6 +777,7 @@ export default function AddPage() {
             return;
           }
           setMeta(data.metadata);
+          setActiveTab(2);
           setPrompts(Array.isArray(data.prompts) ? data.prompts : []);
           setApiPrompts(Array.isArray(data.api_prompts) && data.api_prompts.length ? data.api_prompts : (Array.isArray(data.prompts) ? data.prompts : []));
           setChapterPrompt(typeof data.chapter_prompt === "string" ? data.chapter_prompt : "");
@@ -795,6 +847,9 @@ export default function AddPage() {
 
   function changeTranslationMode(mode) {
     if (dubbingRef.current || loading) return;
+    // Bản dịch thủ công (ChatGPT/Gemini...) và bản dịch API là 2 nguồn khác
+    // nhau -> đổi mode thì xóa sạch, không giữ lại của mode cũ lẫn qua mode
+    // mới (tránh hiểu lầm đây là kết quả API trong khi thực ra là dán tay).
     setTranslationMode(mode);
     setResponses({});
     setValidated({});
@@ -845,13 +900,48 @@ export default function AddPage() {
     );
   }
 
-  async function onValidate(i) {
-    if (dubbingRef.current || loading || translatingPrompts[i]) return;
-    const res = await validateBatch(i);
-    if (dubbingRef.current) return;
-    setValidated((v) => ({ ...v, [i]: res }));
-    if (!res.ok && res.segments?.length) {
-      setExpandedResponses((cur) => ({ ...cur, [`content-${i}`]: true }));
+  async function onValidateAll() {
+    if (dubbingRef.current || loading || validatingAll) return;
+    setValidatingAll(true);
+    setError("");
+    try {
+      let allOk = true;
+      let warningCount = 0;
+      if (chapterPrompt) {
+        const chapterResult = await validateChapterTranslation();
+        if (dubbingRef.current) return;
+        if (!chapterResult?.ok) allOk = false;
+      }
+      for (let i = 0; i < activePrompts.length; i += 1) {
+        const res = await validateBatch(i);
+        if (dubbingRef.current) return;
+        setValidated((v) => ({ ...v, [i]: res }));
+        if (!res.ok) {
+          allOk = false;
+          if (res.segments?.length) {
+            setExpandedResponses((cur) => ({ ...cur, [`content-${i}`]: true }));
+          }
+        } else if (res.warnings?.length) {
+          warningCount += res.warnings.length;
+        }
+      }
+      // Đạt hết mới sang bước Dubbing; còn mục lỗi thì ở lại tab này cho
+      // người dùng sửa ngay trên card đang báo đỏ. Cảnh báo không chặn dub
+      // nhưng phải hỏi lại — thường là câu dịch dài hơn thời lượng gốc,
+      // audio sẽ bị đọc nhanh/nén.
+      if (allOk) {
+        if (warningCount > 0) {
+          const proceed = window.confirm(
+            `Nội dung hợp lệ nhưng có ${warningCount} cảnh báo (câu dịch dài hơn thời lượng gốc, audio có thể bị đọc nhanh). Vẫn tiếp tục sang bước Dubbing?`,
+          );
+          if (!proceed) return;
+        }
+        setActiveTab(3);
+      }
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setValidatingAll(false);
     }
   }
 
@@ -1069,8 +1159,29 @@ export default function AddPage() {
   ));
   const hasChapters = Boolean(chapterPrompt);
   const chaptersValid = !hasChapters || Boolean(chapterValidation?.ok);
+  // Nút "Xác nhận" chung chỉ mở khi mọi mục đã có nội dung để kiểm tra.
+  const allFilled = activePrompts.length > 0
+    && activePrompts.every((_, i) => (responses[i] ?? "").trim())
+    && (!hasChapters || chapterResponse.trim());
   const translationsRunning = Object.keys(translatingPrompts).length > 0 || chapterTranslating;
   const readyToDub = allValid && chaptersValid && !translationsRunning;
+  const validatedOkCount = activePrompts.reduce(
+    (count, _, i) => count + (validated[i]?.ok ? 1 : 0),
+    0,
+  );
+
+  // Thẻ thông tin video — hiện ở tab 1 (ngay sau khi load) và lặp lại ở tab 3
+  // làm phần recap trước khi bấm dubbing.
+  const metaBox = meta && (
+    <div className="meta-box">
+      {meta.thumbnail && <img src={meta.thumbnail} alt="" />}
+      <div>
+        <div className="meta-title">{meta.title}</div>
+        <div className="meta-sub">{meta.channel}</div>
+        <div className="meta-sub">ID: {meta.video_id}</div>
+      </div>
+    </div>
+  );
 
   async function pollDubJob(jobId) {
     pollingJobRef.current = jobId;
@@ -1086,10 +1197,23 @@ export default function AddPage() {
           router.push(`/video/${s.result}`);
           return;
         }
+        if (s.status === "cancelled") {
+          // Đã hủy: KHÔNG xóa nháp, KHÔNG chuyển trang — trả về trạng thái sẵn
+          // sàng để người dùng chỉnh rồi dub lại. Giữ nguyên bản dịch đã xác nhận.
+          dubbingRef.current = false;
+          setDubbing(false);
+          setCancelling(false);
+          setDubJobId(null);
+          setJobParam(null);
+          setStage("");
+          setProgress(0);
+          return;
+        }
         if (s.status === "error") {
           setError(s.error || "Lỗi không xác định");
           dubbingRef.current = false;
           setDubbing(false);
+          setCancelling(false);
           setDubJobId(null);
           setJobParam(null);
           return;
@@ -1133,6 +1257,9 @@ export default function AddPage() {
       const dubTtsConfig = {
         ...baseDubTtsConfig,
         asr_preset: selectedSpeechPreset?.id || speechPreset,
+        // VRAM khai ở phần "Phần cứng" quyết định tách nhạc nền (Demucs) chạy
+        // GPU hay CPU. Đặt 0 để chạy full CPU dù máy có GPU.
+        background_vram_gb: Number(hwVram) || 0,
         translation: {
           mode: translationMode,
           provider: translationMode === "api" ? translationProvider : "manual",
@@ -1152,8 +1279,24 @@ export default function AddPage() {
       setError(String(e));
       dubbingRef.current = false;
       setDubbing(false);
+      setCancelling(false);
       setDubJobId(null);
       setJobParam(null);
+    }
+  }
+
+  async function onCancelDub() {
+    // Hủy HỢP TÁC: gửi yêu cầu rồi để vòng poll thấy status "cancelled" mà tự
+    // dọn UI — không reset lạc quan, tôn trọng việc backend thật sự làm (nếu
+    // dub kịp xong trước khi hủy ăn thì poll thấy "done" và chuyển trang).
+    if (!dubJobId || cancelling) return;
+    setCancelling(true);
+    try {
+      await api.cancelDub(dubJobId);
+    } catch (e) {
+      // 404 = job đã kết thúc (xong/lỗi) ngay trước khi bấm — poll sẽ tự xử lý,
+      // không cần báo lỗi. Chỉ nhả cờ để nút không kẹt "Đang hủy".
+      setCancelling(false);
     }
   }
 
@@ -1366,18 +1509,32 @@ export default function AddPage() {
     <main className="page-content">
       <div className="create-layout">
         <aside className="create-steps" aria-label="Quy trình tạo lồng tiếng">
-          <div className={"step done"}>
+          <button
+            type="button"
+            className={"step" + (activeTab === 1 ? " active" : "") + (meta ? " done" : "")}
+            onClick={() => setActiveTab(1)}
+          >
             <span>1</span>
             <div><b>Nạp video</b><p>Lấy metadata, audio và transcript.</p></div>
-          </div>
-          <div className={activePrompts.length ? "step done" : "step"}>
+          </button>
+          <button
+            type="button"
+            className={"step" + (activeTab === 2 ? " active" : "") + (allValid && chaptersValid ? " done" : "")}
+            onClick={() => meta && setActiveTab(2)}
+            disabled={!meta}
+          >
             <span>2</span>
             <div><b>Dịch nội dung</b><p>Kiểm tra lời thoại và phân cảnh trước khi ghép.</p></div>
-          </div>
-          <div className={readyToDub ? "step done" : "step"}>
+          </button>
+          <button
+            type="button"
+            className={"step" + (activeTab === 3 ? " active" : "")}
+            onClick={() => activePrompts.length > 0 && setActiveTab(3)}
+            disabled={!activePrompts.length}
+          >
             <span>3</span>
             <div><b>Dubbing</b><p>Tạo giọng đọc và xuất video.</p></div>
-          </div>
+          </button>
         </aside>
 
         <section className="create-panel">
@@ -1398,6 +1555,8 @@ export default function AddPage() {
             )}
           </div>
 
+          {activeTab === 1 && (
+          <>
             <div className="url-box">
             <label htmlFor="youtube-url">URL YouTube</label>
             <div className="url-row">
@@ -1558,63 +1717,13 @@ export default function AddPage() {
               )}
             </div>
           )}
+          {metaBox}
+          </>
+          )}
           {error && <div className="tag-fail">{error}</div>}
 
-          {meta && (
-            <div className="meta-box">
-              {meta.thumbnail && <img src={meta.thumbnail} alt="" />}
-              <div>
-                <div className="meta-title">{meta.title}</div>
-                <div className="meta-sub">{meta.channel}</div>
-                <div className="meta-sub">ID: {meta.video_id}</div>
-              </div>
-            </div>
-          )}
-
-            {activePrompts.length > 0 && (
+            {activeTab === 2 && activePrompts.length > 0 && (
               <div className="prompt-workflow">
-                <div className="tts-panel">
-                  <div className="tts-panel-head">
-                    <div>
-                      <span>TTS</span>
-                      <strong>{selectedTtsEngine.label || selectedTtsEngine.id} / {selectedTtsVoiceLabel}</strong>
-                    </div>
-                    {selectedTtsEngine.description && <em>{selectedTtsEngine.description}</em>}
-                  </div>
-	                  <div className="tts-grid">
-	                    <label className="tts-select">
-	                      <span>Giọng đọc</span>
-	                      <select
-	                        value={ttsVoiceChoice}
-	                        onChange={(e) => changeTtsVoiceChoice(e.target.value)}
-	                        disabled={dubbing || currentVoiceOptions.length <= 1}
-	                      >
-	                        {currentVoiceOptions.map((voice) => (
-	                          <option
-	                            key={voice.id}
-	                            value={selectedTtsEngine.id === "supertonic" ? voice.id : `preset:${voice.id}`}
-	                          >
-	                            {voice.label || voice.id}
-	                          </option>
-	                        ))}
-	                      </select>
-	                    </label>
-	                    <label className="tts-select">
-                          <span>Chất lượng</span>
-                          <select
-                            value={ttsConfig.num_step}
-                            onChange={(e) => updateTtsConfig({ num_step: Number(e.target.value) })}
-                            disabled={dubbing}
-                          >
-                            {ttsQualityOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-		                  </div>
-                </div>
                 <div className="section-head">
                   <div>
                     <h2>Dịch nội dung</h2>
@@ -1623,9 +1732,11 @@ export default function AddPage() {
                         ? "Dịch tự động bằng API rồi tự kiểm tra định dạng trước khi dubbing."
                         : "Copy từng prompt sang ChatGPT rồi dán câu trả lời vào đây."}
                     </p>
-                    {/* Nút mở ChatGPT đặt NGAY DƯỚI câu hướng dẫn nhắc tới nó
-                        (đúng dòng chảy đọc), là hành động phụ mở tab ngoài —
-                        không phải CTA cam tranh chú ý với "Xác nhận". */}
+                    {/* Control phụ theo mode đặt NGAY DƯỚI câu hướng dẫn nhắc
+                        tới nó (đúng dòng chảy đọc): mở ChatGPT (thủ công)
+                        hoặc chọn provider/model + dịch tất cả (API) — không
+                        phải CTA chính tranh chú ý với "Xác nhận", nên không
+                        đặt lên cột phải cạnh dropdown "Chế độ dịch". */}
                     {!apiTranslationMode && (
                       <div className="provider-actions">
                         {TRANSLATION_PROVIDERS.map((provider) => (
@@ -1639,21 +1750,6 @@ export default function AddPage() {
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div className="translation-tools">
-                    <div className="translation-mode-controls">
-                      <label className="tts-select">
-                        <span>Chế độ dịch</span>
-                        <select
-                          value={translationMode}
-                          onChange={(event) => changeTranslationMode(event.target.value)}
-                          disabled={loading || dubbing || translatingAny}
-                        >
-                          <option value="manual">Thủ công</option>
-                          <option value="api">API</option>
-                        </select>
-                      </label>
-                    </div>
                     {apiTranslationMode && (
                       <div className="translation-api-controls" aria-label="Dịch bằng API">
                         <label className="tts-select">
@@ -1695,6 +1791,21 @@ export default function AddPage() {
                       </div>
                     )}
                   </div>
+                  <div className="translation-tools">
+                    <div className="translation-mode-controls">
+                      <label className="tts-select">
+                        <span>Chế độ dịch</span>
+                        <select
+                          value={translationMode}
+                          onChange={(event) => changeTranslationMode(event.target.value)}
+                          disabled={loading || dubbing || translatingAny}
+                        >
+                          <option value="manual">Thủ công</option>
+                          <option value="api">API</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
               <div className="prompt-list">
@@ -1706,47 +1817,46 @@ export default function AddPage() {
                         <strong>Phân cảnh</strong>
                         <span>{meta?.chapters?.length || 0} mục</span>
                       </span>
-                      {apiTranslationMode ? (
-                        <button
-                          type="button"
-                          className="chip"
-                          disabled={loading || dubbing || chapterTranslating || !translationProvider || !translationModel}
-                          onClick={translateChaptersByApi}
-                        >
-                          {chapterTranslating ? "Đang dịch" : (chapterResponse.trim() ? "Dịch lại API" : "Dịch API")}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className={"chip chip-copy" + (chapterCopied ? " chip-ok" : "")}
-                          disabled={loading || dubbing}
-                          onClick={copyChapterPrompt}
-                        >
-                          {chapterCopied ? "Đã copy" : "Copy prompt"}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="chip chip-pasted"
-                        disabled={loading || dubbing}
-                        onClick={() => setChapterModalOpen(true)}
-                      >
-                        {chapterResponse.trim() ? "Sửa nội dung" : "Dán kết quả dịch"}
-                      </button>
+                      <div className="chapter-prompt-actions">
+                        {apiTranslationMode ? (
+                          <button
+                            type="button"
+                            className="chip"
+                            disabled={loading || dubbing || chapterTranslating || !translationProvider || !translationModel}
+                            onClick={translateChaptersByApi}
+                          >
+                            {chapterTranslating ? "Đang dịch" : (chapterResponse.trim() ? "Dịch lại API" : "Dịch API")}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={"chip chip-copy" + (chapterCopied ? " chip-ok" : "")}
+                            disabled={loading || dubbing}
+                            onClick={copyChapterPrompt}
+                          >
+                            {chapterCopied ? "Đã copy" : "Copy prompt"}
+                          </button>
+                        )}
+                        {/* API mode dịch qua nút "Dịch API" bên trái, không cho
+                            dán tay -> chỉ hiện "Sửa nội dung" sau khi đã có
+                            kết quả, giống card prompt thường. */}
+                        {(!apiTranslationMode || chapterResponse.trim()) && (
+                          <button
+                            type="button"
+                            className={"chip" + (chapterResponse.trim() ? " chip-pasted" : "")}
+                            disabled={loading || dubbing}
+                            onClick={() => setChapterModalOpen(true)}
+                          >
+                            {chapterResponse.trim() ? "Sửa nội dung" : "Dán kết quả dịch"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="prompt-end">
                       {chapterValidation == null && <span className="tag-wait">Chờ</span>}
                       {chapterValidation?.ok && <span className="tag-ok">Đã xác nhận</span>}
                       {chapterValidation && !chapterValidation.ok && <span className="tag-fail">Lỗi</span>}
                       {dubbing && chapterValidation?.ok && <span className="tag-ok">Đã khóa</span>}
-                      <button
-                        type="button"
-                        className="primary"
-                        disabled={!chapterResponse.trim() || loading || dubbing || chapterTranslating}
-                        onClick={validateChapterTranslation}
-                      >
-                        Xác nhận
-                      </button>
                     </div>
                     {chapterValidation && !chapterValidation.ok && (
                       <div className="prompt-error">
@@ -1807,17 +1917,10 @@ export default function AddPage() {
                         {v == null && <span className="tag-wait">Chờ</span>}
                         {v?.ok && !v.warnings?.length && <span className="tag-ok">{v.segments.length} câu</span>}
                         {v?.ok && v.warnings?.length > 0 && (
-                          <span className="tag-fail">{v.warnings.length} cảnh báo</span>
+                          <span className="tag-warn">{v.warnings.length} cảnh báo</span>
                         )}
                         {v && !v.ok && <span className="tag-fail">Lỗi</span>}
                         {dubbing && v?.ok && <span className="tag-ok">Đã khóa</span>}
-                        <button
-                          className="primary"
-                          disabled={!resp.trim() || loading || dubbing || translatingPrompts[i]}
-                          onClick={() => onValidate(i)}
-                        >
-                          Xác nhận
-                        </button>
                       </div>
                       {v && !v.ok && (
                         <div className="prompt-error">
@@ -1841,9 +1944,6 @@ export default function AddPage() {
                             {ttsErrorCount > 0 && (
                               <b className="fail">{ttsErrorCount} lỗi</b>
                             )}
-                            {ttsErrorCount === 0 && v?.warnings?.length > 0 && (
-                              <b>{v.warnings.length} cảnh báo</b>
-                            )}
                           </button>
                           {expandedResponses[`content-${i}`] && (
                             <div className="content-body">
@@ -1854,7 +1954,7 @@ export default function AddPage() {
                                     const segmentWarnings = segment.normalization?.warnings || [];
                                     return (
                                       <div
-                                        className={"tts-text-row" + (segmentErrors.length ? " has-error" : "")}
+                                        className={"tts-text-row" + (segmentErrors.length ? " has-error" : segmentWarnings.length ? " has-warning" : "")}
                                         key={segmentIndex}
                                       >
                                         <span>{segmentIndex + 1}</span>
@@ -1891,6 +1991,85 @@ export default function AddPage() {
                 })}
               </div>
 
+              <div className="validate-bar">
+                {!allFilled && (
+                  <p className="validate-hint">
+                    Dán hoặc dịch đủ nội dung các mục trên rồi mới xác nhận được.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!allFilled || loading || dubbing || validatingAll || translationsRunning}
+                  onClick={onValidateAll}
+                >
+                  {validatingAll ? "Đang kiểm tra" : "Xác nhận"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 3 && activePrompts.length > 0 && (
+            <div className="prompt-workflow">
+              {metaBox}
+              <div className="dub-summary">
+                <p>
+                  Bản dịch: <b>{validatedOkCount}/{activePrompts.length} prompt đã xác nhận</b>
+                  {hasChapters && (
+                    <> · phân cảnh {chapterValidation?.ok ? "đã xác nhận" : "chưa xác nhận"}</>
+                  )}
+                </p>
+                {!readyToDub && !dubbing && (
+                  <p className="dub-summary-hint">
+                    <span>Xác nhận đủ nội dung ở bước 2 rồi mới bắt đầu dubbing được.</span>
+                    <button type="button" className="chip" onClick={() => setActiveTab(2)}>
+                      Về bước 2
+                    </button>
+                  </p>
+                )}
+              </div>
+              <div className="tts-panel">
+                <div className="tts-panel-head">
+                  <div>
+                    <span>TTS</span>
+                    <strong>{selectedTtsEngine.label || selectedTtsEngine.id} / {selectedTtsVoiceLabel}</strong>
+                  </div>
+                  {selectedTtsEngine.description && <em>{selectedTtsEngine.description}</em>}
+                </div>
+                <div className="tts-grid">
+                  <label className="tts-select">
+                    <span>Giọng đọc</span>
+                    <select
+                      value={ttsVoiceChoice}
+                      onChange={(e) => changeTtsVoiceChoice(e.target.value)}
+                      disabled={dubbing || currentVoiceOptions.length <= 1}
+                    >
+                      {currentVoiceOptions.map((voice) => (
+                        <option
+                          key={voice.id}
+                          value={selectedTtsEngine.id === "supertonic" ? voice.id : `preset:${voice.id}`}
+                        >
+                          {voice.label || voice.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="tts-select">
+                    <span>Chất lượng</span>
+                    <select
+                      value={ttsConfig.num_step}
+                      onChange={(e) => updateTtsConfig({ num_step: Number(e.target.value) })}
+                      disabled={dubbing}
+                    >
+                      {ttsQualityOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
               <div className="publish-bar">
                 <label className="background-toggle">
                   <input
@@ -1904,28 +2083,49 @@ export default function AddPage() {
                   />
                   <span>Giữ nhạc nền (lâu hơn vài phút)</span>
                 </label>
-                <button className="primary" disabled={!readyToDub || dubbing} onClick={onDub}>
-                  {dubbing ? "Đang xử lý" : "Bắt đầu dubbing"}
-                </button>
+                {!dubbing && (
+                  <button className="primary" disabled={!readyToDub} onClick={onDub}>
+                    Bắt đầu dubbing
+                  </button>
+                )}
                 {dubbing && (() => {
+                  const keepBg = ttsConfig.keep_background === true;
+                  const steps = keepBg ? DUB_STEPS_WITH_BG : DUB_STEPS;
+                  const stepIdx = dubStepIndex(progress, stage, keepBg);
                   const tts = parseTtsProgress(stage);
-                  return tts ? (
-                    <div className="dub-progress">
-                      <div className="stage stage-running">
-                        <span className="eq-loader" aria-hidden="true" />
+                  return (
+                    <div className="dub-pipeline">
+                      <div className="dub-steps">
+                        {steps.map((step, i) => (
+                          <div
+                            key={step.key}
+                            className={
+                              "dub-step"
+                              + (i < stepIdx ? " done" : "")
+                              + (i === stepIdx ? " active" : "")
+                            }
+                          >
+                            {i === stepIdx && <span className="eq-loader" aria-hidden="true" />}
+                            <span>{step.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="dub-stage-detail">
                         <span>{stage}…</span>
+                        {tts && (
+                          <div className="dub-progress-bar">
+                            <div className="dub-progress-fill" style={{ width: `${tts.pct}%` }} />
+                          </div>
+                        )}
                       </div>
-                      <div className="dub-progress-bar">
-                        <div className="dub-progress-fill" style={{ width: `${tts.pct}%` }} />
-                      </div>
-                      <div className="dub-progress-label progress-percent-only">
-                        <span>{tts.pct}%</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="dub-stage-wait">
-                      <span className="eq-loader" aria-hidden="true" />
-                      {stage}…
+                      <button
+                        type="button"
+                        className="dub-cancel"
+                        onClick={onCancelDub}
+                        disabled={cancelling}
+                      >
+                        {cancelling ? "Đang hủy…" : "Hủy dubbing"}
+                      </button>
                     </div>
                   );
                 })()}
