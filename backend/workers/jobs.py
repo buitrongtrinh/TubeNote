@@ -34,10 +34,29 @@ def create() -> str:
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {
         "status": "running", "stage": "Bắt đầu", "progress": 0,
-        "error": None, "result": None,
+        "error": None, "result": None, "cancel_requested": False,
     }
     _evict()
     return job_id
+
+
+def request_cancel(job_id: str) -> bool:
+    """Yêu cầu hủy job đang chạy (hủy HỢP TÁC — không kill được thread giữa
+    chừng). Đặt cờ để ``fn`` tự kiểm tra ở checkpoint an toàn rồi dừng.
+
+    Trả True nếu đặt được cờ (job tồn tại & đang chạy), False nếu job đã kết
+    thúc/không tồn tại (không có gì để hủy)."""
+    job = JOBS.get(job_id)
+    if not job or job.get("status") != "running":
+        return False
+    job["cancel_requested"] = True
+    return True
+
+
+def is_cancelled(job_id: str) -> bool:
+    """``fn`` gọi để biết có yêu cầu hủy hay chưa (kiểm tra ở checkpoint)."""
+    job = JOBS.get(job_id)
+    return bool(job and job.get("cancel_requested"))
 
 
 def run(job_id: str, fn: Callable[[Callable], object]) -> None:
@@ -53,7 +72,12 @@ def run(job_id: str, fn: Callable[[Callable], object]) -> None:
         result = fn(update)
         update(status="done", progress=100, stage="Hoàn tất", result=result)
     except Exception as e:  # noqa: BLE001
-        update(status="error", error=str(e))
+        # fn ném exception SAU khi đã có yêu cầu hủy = hủy thành công (fn dừng
+        # tại checkpoint), không phải lỗi thật -> trạng thái "cancelled".
+        if is_cancelled(job_id):
+            update(status="cancelled", stage="Đã hủy", error=None)
+        else:
+            update(status="error", error=str(e))
 
 
 def status(job_id: str) -> dict | None:

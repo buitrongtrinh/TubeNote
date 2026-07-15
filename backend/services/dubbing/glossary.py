@@ -19,6 +19,7 @@ BUILTIN_GLOSSARY: dict[str, str] = {
     "SIM": "sim",
     "PIN": "pin",
     "NASA": "na sa",
+    "NVIDIA": "en vi đi ei",
 }
 
 _CACHE: dict[str, object] = {"key": None, "value": None}

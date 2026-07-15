@@ -213,6 +213,7 @@ def dub(req: DubReq, bg: BackgroundTasks):
             req.url, req.segments, tts=req.tts, tts_model=req.tts_model,
             chapter_titles=req.chapter_titles,
             report=lambda p, s: update(progress=p, stage=s),
+            should_cancel=lambda: jobs.is_cancelled(job_id),
         ),
     )
     return {"job_id": job_id}
@@ -221,6 +222,15 @@ def dub(req: DubReq, bg: BackgroundTasks):
 @router.get("/dub/{job_id}")
 def dub_status(job_id: str):
     return _job_or_404(job_id)
+
+
+@router.post("/dub/{job_id}/cancel")
+def dub_cancel(job_id: str):
+    """Yêu cầu hủy dubbing đang chạy (hủy hợp tác — pipeline dừng ở checkpoint
+    gần nhất, thường trong 1 câu TTS). 404 nếu job không còn/không tồn tại."""
+    if not jobs.request_cancel(job_id):
+        raise HTTPException(404, "Job không còn chạy để hủy")
+    return {"ok": True}
 
 
 @router.post("/video/{vid}/segments/{segment_index}/regenerate")

@@ -20,15 +20,44 @@ from typing import Callable, Iterator
 import imageio_ffmpeg
 
 
-def best_demucs_device(requested: str | None = None) -> str:
-    """Resolve the Demucs device, auto-picking CUDA when available."""
+# Demucs htdemucs đo thật cần ~0.9GB VRAM (gồm cả CUDA context của subprocess).
+# Đòi ngưỡng cao hơn để trừ hao dao động activation + phân mảnh -> còn dưới
+# ngưỡng thì lùi CPU cho chắc thay vì để dub vỡ vì OOM.
+_DEMUCS_MIN_FREE_VRAM = 1536 * 1024 * 1024
+# Cổng Ý ĐỊNH theo VRAM người dùng khai ở bước cấu hình phần cứng: dưới mức
+# này (kể cả 0 = cố tình test full CPU / máy không GPU) thì tách nhạc nền chạy
+# CPU dù máy có card. Thấp hơn ngưỡng OmniVoice nhiều vì Demucs nhẹ hơn hẳn.
+_DEMUCS_MIN_CONFIG_VRAM_GB = 2.0
+
+
+def best_demucs_device(requested: str | None = None, *, vram_gb: float | None = None) -> str:
+    """Resolve the Demucs device from user config + real GPU state.
+
+    ``requested`` cụ thể ("cpu"/"cuda") -> tôn trọng nguyên văn (override thủ
+    công / test). "auto"/rỗng/None -> tự chọn theo 2 cổng:
+
+    1. Ý ĐỊNH — ``vram_gb`` là VRAM người dùng khai ở bước cấu hình phần cứng.
+       < ``_DEMUCS_MIN_CONFIG_VRAM_GB`` (0 = test full CPU hoặc máy không GPU)
+       -> ``cpu``, dù máy thật có card. Cho phép người dùng chủ động chạy toàn
+       bộ pipeline trên CPU. ``vram_gb=None`` (không truyền — vd regenerate) =
+       bỏ qua cổng này, chỉ xét GPU thật.
+    2. AN TOÀN — máy thật có CUDA và ``mem_get_info`` còn đủ VRAM trống mới
+       dùng ``cuda`` (Demucs ~0.9GB, nhanh ~3-4x CPU). Bước tách nhạc nền chạy
+       sau TTS nhưng OmniVoice có thể còn giữ model trên GPU; đo thật vẫn còn
+       ~4GB trống trên card 6GB nên dư. GPU bị lấp gần hết -> lùi ``cpu``,
+       không OOM.
+    """
     if requested and requested not in ("auto", ""):
         return requested
+    if vram_gb is not None and float(vram_gb or 0) < _DEMUCS_MIN_CONFIG_VRAM_GB:
+        return "cpu"
     try:
         import torch
 
         if torch.cuda.is_available():
-            return "cuda"
+            free, _total = torch.cuda.mem_get_info()
+            if free >= _DEMUCS_MIN_FREE_VRAM:
+                return "cuda"
     except Exception:
         pass
     return "cpu"

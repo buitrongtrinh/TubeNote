@@ -262,7 +262,7 @@ def _merge_background_config(
     on_progress: Optional[Callable[[str], None]] = None,
 ) -> Iterator[tuple[str, float, float, dict]]:
     """Return audio bed path/volumes and metadata for final video mix."""
-    from backend.services.dubbing.background import ensure_background_audio
+    from backend.services.dubbing.background import best_demucs_device, ensure_background_audio
 
     cfg = dict(tts_cfg or {})
     # Mặc định TẮT nhạc nền (Demucs tách nền tốn thêm vài phút/video) — người
@@ -279,11 +279,19 @@ def _merge_background_config(
         }
         return
 
+    # Quyết định GPU/CPU cho tách nhạc nền theo VRAM người dùng khai ở bước cấu
+    # hình phần cứng (background_vram_gb): đủ VRAM + GPU còn trống -> GPU
+    # (nhanh ~3-4x); khai 0 (test full CPU) hoặc GPU chật -> CPU. Regenerate
+    # video cũ không có field này (None) -> best_demucs_device tự xét GPU thật.
+    demucs_device = best_demucs_device(
+        cfg.get("background_device"),
+        vram_gb=cfg.get("background_vram_gb"),
+    )
     with ensure_background_audio(
         vid,
         original_audio,
         cache_path=BACKGROUND_DIR / f"{vid}.wav",
-        device=str(cfg.get("background_device") or "cpu"),
+        device=demucs_device,
         on_progress=on_progress,
     ) as bg_path:
         yield str(bg_path), mix_cfg.background_volume, mix_cfg.dub_volume_with_background, {
@@ -654,6 +662,16 @@ _REGENERATE_LOCKS: dict[str, threading.Lock] = {}
 _DUB_LOCKS: dict[str, threading.Lock] = {}
 
 
+class DubCancelled(Exception):
+    """Ném ra khi người dùng yêu cầu hủy dubbing giữa chừng.
+
+    Hủy HỢP TÁC: pipeline kiểm tra ``should_cancel()`` ở các checkpoint an toàn
+    (đầu mỗi câu TTS, trước bước trộn) rồi ném exception này để thoát sạch —
+    lock per-video được nhả trong ``finally``, chưa ghi metadata nên video
+    KHÔNG bị đánh dấu đã dub. jobs.run bắt exception + thấy cờ hủy -> trạng
+    thái 'cancelled' (không phải 'error')."""
+
+
 def list_tts_models() -> dict:
     omni_budget = CFG.tts.omnivoice_budget
     whisper_presets = []
@@ -739,6 +757,11 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         raise ValueError(f"TTS engine không hợp lệ: {engine!r}")
     # Mặc định TẮT nhạc nền — đồng bộ với DEFAULT_TTS_CONFIG phía frontend.
     keep_background = bool(cfg.get("keep_background", False))
+    # VRAM người dùng khai ở bước cấu hình phần cứng — quyết định tách nhạc nền
+    # (Demucs) chạy GPU hay CPU, độc lập với engine TTS. Giữ None nếu UI không
+    # gửi (vd luồng cũ) để best_demucs_device xét theo GPU thật.
+    raw_bg_vram = cfg.get("background_vram_gb")
+    background_vram_gb = float(raw_bg_vram) if raw_bg_vram not in (None, "") else None
 
     if engine == "supertonic":
         model = str(cfg.get("model") or tts_model or CFG.tts.default_model)
@@ -759,6 +782,7 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
             "instruction": "",
             "num_step": num_step,
             "keep_background": keep_background,
+            "background_vram_gb": background_vram_gb,
         }
 
     model = str(cfg.get("model") or CFG.tts.omnivoice_model)
@@ -819,6 +843,7 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         # detect) — ưu tiên nó; 0/thiếu = auto theo VRAM detect lúc synth.
         "batch_size": int(cfg.get("batch_size") or 0) or TTS_POLICIES["omnivoice"]["batch_size"],
         "keep_background": keep_background,
+        "background_vram_gb": background_vram_gb,
     }
 
 
@@ -1359,18 +1384,23 @@ def run_dubbing(
     tts_model: str | None = None,
     chapter_titles: list[str] | None = None,
     report: Optional[Callable[[int, str], None]] = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> str:
     """Chạy toàn bộ: lưu bản dịch → TTS → trộn video. Trả về video_id.
 
     Chống 2 lần dub trùng cùng video (ghi đè subtitle/audio/mp4 lẫn nhau) bằng
     lock non-blocking per-video. ``report(percent, stage)`` báo tiến độ 0–100%.
+    ``should_cancel()`` (tùy chọn) trả True khi người dùng yêu cầu hủy — pipeline
+    kiểm tra ở checkpoint rồi ném ``DubCancelled``.
     """
     vid = extract_video_id(url)
     lock = _DUB_LOCKS.setdefault(vid, threading.Lock())
     if not lock.acquire(blocking=False):
         raise ValueError("Video này đang được lồng tiếng; đợi lần chạy trước hoàn tất.")
     try:
-        return _run_dubbing_impl(url, segments, tts, tts_model, chapter_titles, report)
+        return _run_dubbing_impl(
+            url, segments, tts, tts_model, chapter_titles, report, should_cancel,
+        )
     finally:
         lock.release()
 
@@ -1382,6 +1412,7 @@ def _run_dubbing_impl(
     tts_model: str | None = None,
     chapter_titles: list[str] | None = None,
     report: Optional[Callable[[int, str], None]] = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> str:
     """Thân dubbing thực tế. Phân bổ %: chuẩn bị 5% · TTS 5→80% · trộn 80→100%."""
     from backend.services.dubbing.common import (
@@ -1395,6 +1426,11 @@ def _run_dubbing_impl(
     def r(percent: int, stage: str):
         if report:
             report(percent, stage)
+
+    def _ckpt():
+        """Checkpoint hủy: ném DubCancelled nếu người dùng đã bấm hủy."""
+        if should_cancel and should_cancel():
+            raise DubCancelled()
 
     vid = extract_video_id(url)
     metadata = load_metadata(vid)
@@ -1451,6 +1487,7 @@ def _run_dubbing_impl(
     # Câu dịch dài quá thời lượng chỉ là cảnh báo (lưu trong normalization của
     # segment, hiển thị ở UI) — không chặn dub. audio_fit sẽ nén tempo để vừa slot.
 
+    _ckpt()
     r(2, "Lưu bản dịch")
     save_translations_to_file(segments, str(subtitle_file))
     data_tts = merge_segments(
@@ -1459,8 +1496,10 @@ def _run_dubbing_impl(
     )
 
     r(5, "Đang tải model giọng nói")
-    # TTS chiếm 5→80%, báo theo từng segment.
+    # TTS chiếm 5→80%, báo theo từng segment. Checkpoint hủy ở ĐÂY (gọi sau mỗi
+    # câu/batch) là điểm dừng chính — TTS là pha lâu nhất nên hủy ăn trong ~1 câu.
     def tts_progress(done: int, total: int):
+        _ckpt()
         r(5 + int(75 * done / total), f"Tổng hợp giọng nói {done}/{total}")
 
     tts_started = time.perf_counter()
@@ -1498,6 +1537,10 @@ def _run_dubbing_impl(
                 on_progress=tts_progress,
             )
         tts_time = time.perf_counter() - tts_started
+    except DubCancelled:
+        # Hủy giữa TTS: không phải lỗi thật -> để run_log ở trạng thái cũ, nhả
+        # lock (finally ở run_dubbing), chưa ghi metadata nên video sạch.
+        raise
     except Exception as exc:
         run_log.update_run(
             run_id,
@@ -1512,7 +1555,9 @@ def _run_dubbing_impl(
     output_speed = float(tts_cfg.get("output_speed") or 1.0)
     save_playback_timings_to_file(str(subtitle_file), output_speed)
 
-    r(82, f"Tải & trộn video ({output_speed:g}x)")
+    # Checkpoint cuối trước khi trộn: sau đây là ffmpeg subprocess (vài giây,
+    # không hủy giữa chừng được) nên hủy tại đây là cơ hội dừng cuối.
+    _ckpt()
     video_prefetch.join()  # đảm bảo file video đã ghi xong trước khi mux đọc
     try:
         original_audio_path = original_audio or download_audio(url)
@@ -1524,6 +1569,12 @@ def _run_dubbing_impl(
             metadata=metadata,
             on_progress=lambda msg: r(82, msg),
         ) as (audio_bed, bed_volume, dub_volume, bg_meta):
+            # Đặt SAU khi tách nhạc nền xong (with-block chỉ vào tới đây khi
+            # Demucs/cache bên trong _merge_background_config đã chạy hết) ->
+            # thứ tự stage luôn đơn điệu: [Tách nhạc nền ->] Trộn video ->
+            # Hoàn tất. Frontend dựa vào đúng chữ này để chọn ô đang chạy
+            # trong chuỗi bước hiển thị.
+            r(82, "Tải & trộn video")
             merge_video_audio(
                 video_path=download_video(url),
                 audio_dub=audio_dub,
@@ -1533,6 +1584,8 @@ def _run_dubbing_impl(
                 dub_volume=dub_volume,
                 playback_speed=output_speed,
             )
+    except DubCancelled:
+        raise
     except Exception as exc:
         run_log.update_run(
             run_id,
