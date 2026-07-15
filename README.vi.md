@@ -10,9 +10,10 @@
 **[English](README.md) | [Tiếng Việt](README.vi.md)**
 
 TubeNote là ứng dụng lồng tiếng video AI và hỏi-đáp video, chạy local-first. Nó
-biến một video YouTube thành video đã lồng tiếng Việt, giữ lại phụ đề có thể
-chỉnh sửa cùng metadata thời gian, và có thêm panel chat RAG để hỏi đáp về nội
-dung video.
+biến một video YouTube **tiếng Anh** thành video đã lồng **tiếng Việt** (ngôn
+ngữ nguồn và đích cố định, không tùy chỉnh được), giữ lại phụ đề có thể chỉnh
+sửa cùng metadata thời gian, và có thêm panel chat RAG để hỏi đáp về nội dung
+video.
 
 Dự án được xây dựng như một hệ thống full-stack thực tế xoay quanh việc bản địa
 hoá video: lấy phụ đề, ASR dự phòng, dịch có tính tới thời lượng, tổng hợp

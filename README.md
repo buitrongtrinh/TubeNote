@@ -9,8 +9,9 @@
 
 **[English](README.md) | [Tiếng Việt](README.vi.md)**
 
-TubeNote is a local-first AI video dubbing and video Q&A application. It turns a
-YouTube video into a Vietnamese dubbed video, keeps editable subtitles and timing
+TubeNote is a local-first AI video dubbing and video Q&A application. It turns an
+**English** YouTube video into a **Vietnamese**-dubbed video (source and target
+languages are fixed, not configurable), keeps editable subtitles and timing
 metadata, and adds a RAG chat panel so users can ask questions about the video.
 
 The project is built as a practical full-stack system around video localization:
