@@ -6,12 +6,19 @@
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml build backend
 FROM python:3.11-slim
 
+ARG TORCH_FLAVOR=cpu
+
 # - ffmpeg: ffmpeg-python (merge_video_audio) gọi binary "ffmpeg" từ PATH.
 # - nodejs: yt-dlp cần JS runtime để giải n-challenge khi dùng cookie đăng
 #   nhập (cookies.py bật js_runtimes {deno,node}); Debian bookworm có node 18,
 #   đủ cho yt-dlp EJS.
+# - build-essential (chỉ image GPU): Triton JIT cần C compiler ở runtime để
+#   build launcher cho các CUDA kernel mà OmniVoice/PyTorch sử dụng.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg nodejs ca-certificates \
+    && if [ "$TORCH_FLAVOR" != "cpu" ]; then \
+        apt-get install -y --no-install-recommends build-essential; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,8 +26,6 @@ WORKDIR /app
 # cpu (mặc định): cài torch/torchaudio bản CPU TRƯỚC để requirements.txt không
 # kéo bản CUDA (~5GB) về một cách vô ích. cuda: bỏ qua bước pin, để pip lấy
 # torch mặc định (kèm CUDA) + cài requirements-gpu.txt.
-ARG TORCH_FLAVOR=cpu
-
 COPY requirements.txt requirements-gpu.txt ./
 RUN if [ "$TORCH_FLAVOR" = "cpu" ]; then \
         pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu; \

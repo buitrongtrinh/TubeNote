@@ -15,3 +15,7 @@ services:
     # Tag riêng với bản CPU (docker-compose.yml) — không build đè lên nhau.
     image: tubenote-backend:gpu
     gpus: all
+    environment:
+      # Triton JIT biên dịch CUDA launcher lúc runtime.
+      - CC=/usr/bin/gcc
+      - CXX=/usr/bin/g++
