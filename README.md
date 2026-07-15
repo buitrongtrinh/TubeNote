@@ -54,7 +54,11 @@ more accurate at nearly the same VRAM cost, see `docs/dubbing.md`).
 
    ![TubeNote translation step](docs/assets/screenshot-translate.webp)
 
-3. Video page — dubbed player, bilingual transcript, per-segment regeneration:
+3. Dubbing video - Choice voice and quality voice, Keep original background music (option):
+
+   ![TubeNote dubbing step](docs/assets/Screenshot-dubbing.webp)  
+
+**Video page — dubbed player, bilingual transcript, per-segment regeneration:**
 
    ![TubeNote video page with player and transcript](docs/assets/screenshot-watch.webp)
 

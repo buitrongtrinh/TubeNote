@@ -55,7 +55,11 @@ VRAM gần như tương đương, xem `docs/dubbing.md`).
 
    ![Bước dịch nội dung TubeNote](docs/assets/screenshot-translate.webp)
 
-3. Trang video — player đã lồng tiếng, transcript song ngữ, tạo lại từng đoạn:
+3. Lồng tiếng — chọn giọng và chất lượng giọng, giữ nhạc nền (lựa chọn): 
+
+   ![Bước dubbing video](docs/assets/Screenshot-dubbing.webp)  
+
+**Trang video — player đã lồng tiếng, transcript song ngữ, tạo lại từng đoạn:**
 
    ![Trang video TubeNote với player và transcript](docs/assets/screenshot-watch.webp)
 

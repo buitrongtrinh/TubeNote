@@ -14,6 +14,7 @@ cookies/*.txt
 
 # Nội dung dùng riêng cho CV, không phải tài liệu public của dự án
 CV_NOTES.md
+VIDEO_SCRIPT.md
 
 # ==============================================================================
 # Runtime output — code tự tạo (os.makedirs)
