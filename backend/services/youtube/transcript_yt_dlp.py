@@ -19,7 +19,7 @@ import yt_dlp
 from ...config import CFG
 from ..video.chapters import chapters_from_video_info
 from .cookies import get_ytdlp_cookie_opts
-from .types import Transcript, TranscriptEntry
+from .types import Transcript
 from .utils import extract_video_id, skip_if_exists
 
 
@@ -128,8 +128,48 @@ def _extract_channel_avatar(channel_id: str | None) -> str:
     return avatar
 
 
-def _clean_transcript(events: list[dict]) -> Transcript | None:
-    entries: list[TranscriptEntry] = []
+def _cues_to_pseudo_words(cues: list[dict]) -> list[dict]:
+    """Chẻ cue caption thành pseudo word-timestamps để đi qua CÙNG bộ máy
+    dựng câu với đường Whisper (``_split_into_entries``).
+
+    Manual sub chỉ có timing theo cue (khối hiển thị), không theo từ — rải
+    từ của mỗi cue lên khoảng thời gian của cue theo tỉ lệ độ dài ký tự.
+    Từ trong cùng cue xếp nối đuôi (gap = 0) nên không bao giờ sinh điểm cắt
+    pause giả; gap THẬT chỉ xuất hiện giữa 2 cue (từ timing caption). Dấu câu
+    dính theo từ nên quy tắc cắt tại dấu kết câu hoạt động y hệt Whisper.
+    Mốc nội suy chỉ lệch khi câu kết thúc GIỮA cue (vài trăm ms, trong sức
+    hấp thụ của audio_fit).
+    """
+    words: list[dict] = []
+    for cue in cues:
+        tokens = str(cue["text"]).split()
+        if not tokens:
+            continue
+        start = float(cue["start"])
+        duration = max(float(cue["duration"]), 0.05)
+        total_chars = sum(len(token) for token in tokens) + len(tokens) - 1
+        cursor = start
+        for token in tokens:
+            share = (len(token) + 1) / max(1, total_chars)
+            end = min(start + duration, cursor + duration * share)
+            words.append({"word": token, "start": round(cursor, 3), "end": round(end, 3)})
+            cursor = end
+    return words
+
+
+def _clean_transcript(events: list[dict], pause_alpha: float | None = None) -> Transcript | None:
+    """json3 events -> câu hoàn chỉnh.
+
+    Cue caption chia theo DÒNG HIỂN THỊ (vừa màn hình), không theo câu — 1 câu
+    nói thường bị bổ thành 3-4 cue, ngược lại 1 cue có thể chứa cuối câu này +
+    đầu câu kia. Dùng thẳng cue làm đơn vị dịch/TTS cho ra câu cụt vụn vặt —
+    nên dựng lại câu bằng cùng thuật toán với đường Whisper (qua pseudo-words,
+    xem ``_cues_to_pseudo_words``).
+    """
+    from backend.services.youtube.transcript_whisper import _split_into_entries
+    from backend.config import CFG
+
+    cues: list[dict] = []
     for event in events:
         segs = event.get("segs")
         if not segs:
@@ -137,15 +177,23 @@ def _clean_transcript(events: list[dict]) -> Transcript | None:
         text = "".join(seg.get("utf8", "") for seg in segs).strip()
         if not text:
             continue
-        entries.append(TranscriptEntry(
-            text=text,
-            start=event.get("tStartMs", 0) / 1000,
-            duration=event.get("dDurationMs", 0) / 1000,
-        ))
+        cues.append({
+            "text": text,
+            "start": event.get("tStartMs", 0) / 1000,
+            "duration": event.get("dDurationMs", 0) / 1000,
+        })
+    if not cues:
+        return None
+    entries = _split_into_entries(
+        _cues_to_pseudo_words(cues),
+        max_words=CFG.whisper.sentence_max_words,
+        pause_alpha=pause_alpha if pause_alpha is not None else CFG.whisper.caption_sentence_pause_alpha,
+        min_words=CFG.whisper.sentence_min_words,
+    )
     return Transcript(entries) if entries else None
 
 
-def _get_transcript(info: dict, lang: str) -> Transcript | None:
+def _get_transcript(info: dict, lang: str, pause_alpha: float | None = None) -> Transcript | None:
     tracks = (info.get("subtitles") or {}).get(lang)
     if not tracks:
         return None
@@ -156,7 +204,7 @@ def _get_transcript(info: dict, lang: str) -> Transcript | None:
 
     res = requests.get(json3_track["url"], timeout=15)
     res.raise_for_status()
-    return _clean_transcript(res.json().get("events", []))
+    return _clean_transcript(res.json().get("events", []), pause_alpha)
 
 
 def _build_metadata(info: dict) -> VideoMetadata:
@@ -244,6 +292,7 @@ def fetch_transcript(
     languages: list[str] =["en"],
     output_dir: str = SUBTITLES_DIR,
     ext: str = "json",
+    pause_alpha: float | None = None,
 ) -> str | None:
     """Fetch manual subtitle, lặp qua ``languages`` theo priority.
 
@@ -253,7 +302,7 @@ def fetch_transcript(
     video_id = extract_video_id(url)
     info = _extract_info(url, languages)
     for lang in languages:
-        trans = _get_transcript(info, lang)
+        trans = _get_transcript(info, lang, pause_alpha)
         if trans:
             return trans.save_json(video_id=video_id, folder=output_dir)
     return None

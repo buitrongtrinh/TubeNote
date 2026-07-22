@@ -31,8 +31,8 @@ export const api = {
   drafts: () => jget("/api/drafts"),
   deleteVideo: (vid) => jdelete(`/api/video/${encodeURIComponent(vid)}`),
   meta: (vid) => jget(`/api/video/${vid}/meta`),
-  load: (url, engine = "supertonic", speech_preset = "cpu") =>
-    jpost("/api/load", { url, engine, speech_preset }),
+  load: (url, engine = "supertonic", speech_preset = "cpu", manual_batch_size = null, api_batch_size = null, sentence_split_mode = null) =>
+    jpost("/api/load", { url, engine, speech_preset, manual_batch_size, api_batch_size, sentence_split_mode }),
   loadStatus: (jobId) => jget(`/api/load/${jobId}`),
   validate: (prompt_index, response, expected = 0, engine = "supertonic", budgets = []) =>
     jpost("/api/validate", { prompt_index, response, expected, engine, budgets }),
@@ -46,6 +46,7 @@ export const api = {
   }),
   dubStatus: (jobId) => jget(`/api/dub/${jobId}`),
   cancelDub: (jobId) => jpost(`/api/dub/${jobId}/cancel`, {}),
+  cancelLoad: (jobId) => jpost(`/api/load/${jobId}/cancel`, {}),
   regenerateSegment: (vid, segmentIndex, text_vi, pronunciation_map = {}, num_step = 48) =>
     jpost(`/api/video/${vid}/segments/${segmentIndex}/regenerate`, {
       text_vi, pronunciation_map, num_step,

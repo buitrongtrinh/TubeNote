@@ -271,7 +271,6 @@ def synthesize_omnivoice(
     voice_mode = config.get("voice_mode") or "default"
     ref_audio = config.get("reference_audio_id") or config.get("ref_audio") or None
     ref_text = config.get("reference_text") or config.get("ref_text") or None
-    instruct = (config.get("instruction") or "").strip() or None
     language = config.get("language") or "vi"
     num_step = int(config.get("num_step") or 32)
     postprocess_output = bool(config.get("postprocess_output", False))
@@ -349,12 +348,6 @@ def synthesize_omnivoice(
         }
         if voice_mode == "clone" and clone_prompt is not None:
             kwargs["voice_clone_prompt"] = [clone_prompt] * len(batch)
-            if instruct:
-                kwargs["instruct"] = [instruct] * len(batch)
-        elif voice_mode == "design" and instruct:
-            kwargs["instruct"] = [instruct] * len(batch)
-        elif instruct:
-            kwargs["instruct"] = [instruct] * len(batch)
 
         try:
             # KHÔNG có inference_mode() thì PyTorch build/giữ lại autograd

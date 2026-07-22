@@ -34,7 +34,7 @@ def _subtitle_candidates(video_id: str) -> list[tuple[str, Path]]:
     ]
 
 
-def _segment_text(seg: dict, source: str) -> str:
+def _segment_text(seg: dict) -> str:
     if seg.get("text_vi"):
         return str(seg["text_vi"]).strip()
     if seg.get("text_tts"):
@@ -52,7 +52,7 @@ def load_local_subtitle_segments(video_id: str) -> tuple[str, list[dict]]:
         for index, seg in enumerate(raw_segments):
             if not isinstance(seg, dict):
                 continue
-            text = _segment_text(seg, source)
+            text = _segment_text(seg)
             if not text:
                 continue
             start, end = display_range(raw_segments, index, prefer_tts_timing=True)

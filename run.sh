@@ -97,7 +97,19 @@ TAIL_PID=$!
     [ -f "$FE_LOG" ] || break                         # log bị xóa → thoát, không spam
     url=$(grep -oE 'http://localhost:[0-9]+' "$FE_LOG" 2>/dev/null | head -1)
     if [ -n "$url" ] && curl -s -o /dev/null "$url"; then
-      [ -n "$CHROMIUM" ] && [ -x "$CHROMIUM" ] && "$CHROMIUM" "$url" >/dev/null 2>&1 &
+      # setsid: đẩy trình duyệt sang process group RIÊNG. Không có nó, tiến
+      # trình nền vẫn thừa hưởng process group của script (job control tắt
+      # trong script), mà Ctrl+C thì gửi SIGINT cho CẢ nhóm foreground -> tắt
+      # server kéo theo tắt luôn cửa sổ trình duyệt vừa mở. Chỉ lộ ra khi máy
+      # chưa mở Chrome sẵn; có sẵn rồi thì lệnh này chỉ đẩy URL sang instance
+      # cũ (khác nhóm) rồi tự thoát, nên trước đây lúc gặp lúc không.
+      if [ -n "$CHROMIUM" ] && [ -x "$CHROMIUM" ]; then
+        if command -v setsid >/dev/null 2>&1; then
+          setsid "$CHROMIUM" "$url" >/dev/null 2>&1 &
+        else
+          "$CHROMIUM" "$url" >/dev/null 2>&1 &
+        fi
+      fi
       echo "▶ Đã mở $url"
       break
     fi

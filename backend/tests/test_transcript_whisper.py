@@ -133,13 +133,27 @@ class MergeShortRangesTests(unittest.TestCase):
         )
 
     def test_leading_short_range_merges_forward_when_no_previous_neighbor(self):
+        # "First" (không dấu kết câu) — vẫn là mảnh chưa xong, đúng đối tượng
+        # của cơ chế gộp; nếu để "First." (có dấu chấm) thì rơi vào ngoại lệ
+        # "câu đã xong không gộp" và không còn kiểm được cơ chế này.
+        words = [
+            _w("First", 0.0, 0.3),
+            _w("Yes", 1.0, 1.2),
+            _w("Second", 1.25, 1.5), _w("thing", 1.5, 1.8), _w("here.", 1.8, 2.1),
+        ]
+        entries = _split_into_entries(words, 16, 0.02, min_words=2)
+        self.assertEqual([e.text for e in entries], ["First Yes", "Second thing here."])
+
+    def test_sentence_end_range_never_merges_even_if_short(self):
+        # "First." đã có dấu kết câu -> đứng riêng dù chỉ 1 từ, không gộp
+        # ngược với "Yes" phía sau dù không có hàng xóm nào khác gần hơn.
         words = [
             _w("First.", 0.0, 0.3),
             _w("Yes", 1.0, 1.2),
             _w("Second", 1.25, 1.5), _w("thing", 1.5, 1.8), _w("here.", 1.8, 2.1),
         ]
         entries = _split_into_entries(words, 16, 0.02, min_words=2)
-        self.assertEqual([e.text for e in entries], ["First. Yes", "Second thing here."])
+        self.assertEqual([e.text for e in entries], ["First.", "Yes Second thing here."])
 
     def test_min_words_one_disables_merging(self):
         words = [_w("Yes", 0.0, 0.2), _w("okay", 0.5, 0.7)]

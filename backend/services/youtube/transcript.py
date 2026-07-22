@@ -24,10 +24,20 @@ def fetch_transcript(
     languages: list[str],
     on_progress: Optional[ProgressCallback] = None,
     whisper_preset: str | None = None,
-) -> Transcript | None:
-    """Chạy yt-dlp trước, fallback Whisper; trả về Transcript hoặc None.
+    sentence_pause_alpha: float | None = None,
+    caption_pause_alpha: float | None = None,
+) -> tuple[Transcript | None, str | None]:
+    """Chạy yt-dlp trước, fallback Whisper; trả về (Transcript | None, source).
 
-    Báo qua ``on_progress``: cache hit, hoặc fetcher nào thắng.
+    ``source``: "manual_sub" (phụ đề người đăng tự làm) | "whisper" (STT) |
+    "cache" (đọc file đã có — nguồn gốc do lần fetch trước quyết định, caller
+    tra lại metadata nếu cần). Báo qua ``on_progress``: cache hit, hoặc
+    fetcher nào thắng.
+
+    ``sentence_pause_alpha``/``caption_pause_alpha``: override ngưỡng cắt câu
+    theo mode người dùng chọn (None = dùng mặc định config.yaml). Chỉ có tác
+    dụng khi transcript CHƯA có trong cache — cache lưu câu đã dựng sẵn, đổi
+    mode cho video đã load cần xoá cache để dựng lại.
     """
     progress = on_progress or _noop
 
@@ -35,13 +45,16 @@ def fetch_transcript(
     cached_path = os.path.join(SUBTITLES_DIR, f"{video_id}.json")
     if os.path.exists(cached_path):
         progress("Dùng subtitle trong cache")
-        return Transcript.load_from_json(cached_path)
+        return Transcript.load_from_json(cached_path), "cache"
 
     progress("Thử lấy manual subtitle (yt-dlp)…")
-    path = _fetch_ytdlp(url=url, languages=languages, output_dir=SUBTITLES_DIR)
+    path = _fetch_ytdlp(
+        url=url, languages=languages, output_dir=SUBTITLES_DIR,
+        pause_alpha=caption_pause_alpha,
+    )
     if path is not None:
         progress("Có manual subtitle — dùng yt-dlp")
-        return Transcript.load_from_json(path)
+        return Transcript.load_from_json(path), "manual_sub"
 
     progress("Không có manual subtitle → fallback Whisper STT")
     progress("Chuẩn bị Whisper STT…")
@@ -50,8 +63,9 @@ def fetch_transcript(
         output_dir=SUBTITLES_DIR,
         preset=whisper_preset,
         on_progress=progress,
+        sentence_pause_alpha=sentence_pause_alpha,
     )
     if path is None:
-        return None
+        return None, None
     progress("Whisper STT thành công")
-    return Transcript.load_from_json(path)
+    return Transcript.load_from_json(path), "whisper"

@@ -9,7 +9,7 @@ from backend.services.dubbing.glossary import load_glossary
 from backend.services.dubbing.text_normalizer import (
     apply_pronunciation_map,
     canonicalize_text,
-    normalize_for_engine,
+    normalize_for_tts,
 )
 from backend.services.dubbing.translation_parser import parse_translation_result
 
@@ -28,7 +28,7 @@ def normalize_translation_segment(
     # Cascade sinh text_tts: pronunciation map của user (ưu tiên cao nhất, chủ
     # yếu ở luồng regenerate) → glossary + rule expand (số, đơn vị, acronym...).
     mapped, cleaned_map = apply_pronunciation_map(text_vi, pronunciation_map)
-    text_tts, applied_rules = normalize_for_engine(mapped, engine, glossary=load_glossary())
+    text_tts, applied_rules = normalize_for_tts(mapped, glossary=load_glossary())
     if cleaned_map:
         applied_rules = ["pronunciation_map", *applied_rules]
     warnings: list[str] = []
@@ -107,7 +107,9 @@ def prepare_translations_for_tts(
     pronunciation_map: dict | None = None,
 ) -> list[dict]:
     batch_name, translations = parse_translation_result(text)
-    if batch_name != batch_id:
+    # Header con khi retry-chia-nhỏ có hậu tố "_r{depth}_{phần}" (xem
+    # splitPromptForRetry ở frontend) — vẫn coi là khớp batch gốc.
+    if batch_name != batch_id and not batch_name.startswith(f"{batch_id}_r"):
         raise ValueError(f"Batch ID không khớp: nhận '{batch_name}', cần '{batch_id}'")
     if not translations:
         raise ValueError("Không tìm thấy dòng dịch nào")

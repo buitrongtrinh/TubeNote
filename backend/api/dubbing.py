@@ -33,6 +33,15 @@ class LoadReq(BaseModel):
     url: str
     engine: str = "supertonic"
     speech_preset: str | None = None
+    # Số câu mỗi prompt — mỗi chế độ dịch một giá trị riêng. None = dùng mặc
+    # định config.yaml. Gọi lại /load (transcript đã cache, chỉ dựng lại
+    # prompt) để áp dụng số mới cho video đang xem.
+    manual_batch_size: int | None = None
+    api_batch_size: int | None = None
+    # "complete" = ưu tiên câu trọn vẹn (tắt gần hẳn cắt-theo-pause) | None/
+    # bất kỳ giá trị khác = mặc định "khớp hình". Chỉ có tác dụng khi
+    # transcript chưa có trong cache (video mới, hoặc cache đã bị xoá).
+    sentence_split_mode: str | None = None
 
 
 class ValidateReq(BaseModel):
@@ -109,6 +118,10 @@ def load(req: LoadReq, bg: BackgroundTasks):
             on_progress=lambda s: update(stage=s, progress=_load_progress(s)),
             tts_engine=req.engine,
             whisper_preset=req.speech_preset,
+            manual_batch_size=req.manual_batch_size,
+            api_batch_size=req.api_batch_size,
+            sentence_split_mode=req.sentence_split_mode,
+            should_cancel=lambda: jobs.is_cancelled(job_id),
         ),
     )
     return {"job_id": job_id}
@@ -117,6 +130,16 @@ def load(req: LoadReq, bg: BackgroundTasks):
 @router.get("/load/{job_id}")
 def load_status(job_id: str):
     return _job_or_404(job_id)
+
+
+@router.post("/load/{job_id}/cancel")
+def load_cancel(job_id: str):
+    """Yêu cầu hủy nạp video đang chạy (hủy hợp tác — dừng ở checkpoint gần
+    nhất; trong lúc Whisper chạy thì checkpoint rơi vào mỗi 2% tiến độ).
+    404 nếu job không còn/không tồn tại."""
+    if not jobs.request_cancel(job_id):
+        raise HTTPException(404, "Job không còn chạy để hủy")
+    return {"ok": True}
 
 
 @router.post("/validate")
@@ -170,6 +193,19 @@ def translation_models():
     return {
         "default_provider": default_provider,
         "providers": providers,
+        # Frontend chỉ hiển thị các mặc định do backend cấp; không giữ một bộ
+        # số mặc định riêng dễ lệch với config.yaml.
+        "translation_batching": {
+            "manual_batch_size": CFG.translation.manual_batch_size,
+            "manual_min_batch_size": CFG.translation.manual_min_batch_size,
+            "manual_max_batch_size": CFG.translation.manual_max_batch_size,
+            "api_batch_size": CFG.translation.api_batch_size,
+            "api_min_batch_size": CFG.translation.api_min_batch_size,
+            "api_max_batch_size": CFG.translation.api_max_batch_size,
+            "api_max_chars_per_batch": CFG.translation.api_max_chars_per_batch,
+            "api_concurrency": CFG.translation.api_concurrency,
+            "api_job_timeout_sec": CFG.translation.api_job_timeout_sec,
+        },
     }
 
 

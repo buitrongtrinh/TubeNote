@@ -744,6 +744,16 @@ textarea {
   min-width: 150px;
 }
 
+.translation-batch-controls {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.translation-batch-controls .tts-select { width: 120px; }
+.translation-batch-controls .tts-select input { height: 38px; padding: 8px 10px; font-size: 0.84rem; }
+.translation-batch-controls .chip { height: 38px; white-space: nowrap; }
+
 .translation-api-controls {
   display: flex;
   flex-wrap: wrap;
@@ -923,6 +933,54 @@ textarea {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
+}
+
+/* Thanh cân giọng gốc — chỉ hiện khi đã bật giữ nhạc nền */
+.voice-mix {
+  display: block;
+  margin: 12px 0;
+}
+
+.voice-mix-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.voice-mix-label em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.voice-mix input[type="range"] {
+  width: 100%;
+  margin: 8px 0 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.voice-mix input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.voice-mix small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.voice-mix-note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .publish-bar > button { width: 100%; }
@@ -1482,7 +1540,9 @@ textarea {
 
 /* Nút hủy dubbing — hành động phá (không phải CTA cam): viền đỏ nhạt, chỉ đậm
    lên khi hover để không tranh chú ý với chuỗi bước đang chạy phía trên. */
-.dub-cancel {
+/* Nút hủy dùng chung cho cả nạp video lẫn dubbing */
+.dub-cancel,
+.cancel-load {
   margin-top: 14px;
   width: 100%;
   background: transparent;
@@ -1491,12 +1551,14 @@ textarea {
   font-weight: 700;
 }
 
-.dub-cancel:hover:not(:disabled) {
+.dub-cancel:hover:not(:disabled),
+.cancel-load:hover:not(:disabled) {
   background: var(--fail-soft);
   border-color: var(--fail);
 }
 
-.dub-cancel:disabled { opacity: 0.6; }
+.dub-cancel:disabled,
+.cancel-load:disabled { opacity: 0.6; }
 
 /* Thanh bước bên trái — checklist phiên thu, số mono nối bằng rãnh dọc */
 .create-steps {
@@ -2647,6 +2709,8 @@ media-player .vds-time-slider .vds-slider-chapter {
   .meta-box { grid-template-columns: 1fr; }
   .translation-tools { justify-items: stretch; }
   .translation-mode-controls { min-width: 0; }
+  .translation-batch-controls { flex-direction: column; align-items: stretch; }
+  .translation-batch-controls .tts-select { width: 100%; }
   .translation-api-controls { flex-direction: column; align-items: stretch; }
   .translation-api-controls .tts-select:nth-child(1),
   .translation-api-controls .tts-select:nth-child(2) { width: 100%; }

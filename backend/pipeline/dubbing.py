@@ -13,7 +13,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -32,26 +32,6 @@ BACKGROUND_DIR = PROJECT_ROOT / "data" / "background"
 TTS_POLICIES = {
     "supertonic": asdict(CFG.tts.supertonic),
     "omnivoice": asdict(CFG.tts.omnivoice),
-}
-OMNIVOICE_INSTRUCTION_OPTIONS = {
-    "gender": ["male", "female"],
-    "age": ["child", "teenager", "young adult", "middle-aged", "elderly"],
-    "pitch": ["very low pitch", "low pitch", "moderate pitch", "high pitch", "very high pitch"],
-    "style": ["whisper"],
-    "accent": [
-        "american accent", "british accent", "australian accent", "chinese accent",
-        "canadian accent", "indian accent", "korean accent", "portuguese accent",
-        "russian accent", "japanese accent",
-    ],
-    "dialect": [
-        "河南话", "陕西话", "四川话", "贵州话", "云南话", "桂林话",
-        "济南话", "石家庄话", "甘肃话", "宁夏话", "青岛话", "东北话",
-    ],
-}
-OMNIVOICE_INSTRUCTION_TAGS = {
-    tag
-    for options in OMNIVOICE_INSTRUCTION_OPTIONS.values()
-    for tag in options
 }
 OMNIVOICE_SOURCE_VOICE_ID = "source_video"
 
@@ -95,6 +75,17 @@ def _background_meta(metadata: dict) -> dict:
     if isinstance(background, dict):
         return background
     return {}
+
+
+def _stored_voice_percent(background_meta: dict) -> float:
+    """Thanh giọng gốc đã dùng cho video này, đọc từ metadata.
+
+    Thiếu key = video dub từ TRƯỚC khi có tính năng, lúc đó bản mix hoàn toàn
+    không có giọng gốc -> trả 0. Không được rơi về mặc định config (50), vì như
+    vậy chỉ tạo lại một đoạn cũng âm thầm nhét giọng gốc vào cả video cũ.
+    """
+    stored = background_meta.get("original_voice_percent")
+    return 0.0 if stored is None else float(stored)
 
 
 def is_dubbed(vid: str) -> bool:
@@ -186,6 +177,26 @@ def _tts_batch_size_for_log(tts_cfg: dict) -> int | None:
     return batch_size if batch_size > 0 else None
 
 
+def _asr_meta_block(run: dict, raw_tts: dict) -> dict:
+    """Khối "asr" cho metadata.dubbing — phân biệt transcript lấy từ manual
+    sub của kênh (Whisper không chạy, không hiển thị model ASR) với transcript
+    do Whisper STT tạo thật."""
+    engine = _clean_meta_value(run.get("asr_engine"))
+    if engine == "manual_sub":
+        return {
+            "source": "manual_sub",
+            "preset": None,
+            "engine": None,
+            "time_sec": _clean_meta_value(run.get("asr_time_sec")),
+        }
+    return {
+        "source": "whisper" if engine else None,
+        "preset": raw_tts.get("asr_preset") or raw_tts.get("speech_preset"),
+        "engine": engine,
+        "time_sec": _clean_meta_value(run.get("asr_time_sec")),
+    }
+
+
 def _latest_dubbing_metadata(
     *,
     tts_cfg: dict,
@@ -216,11 +227,7 @@ def _latest_dubbing_metadata(
             "speed_alpha": tts_cfg.get("speed_alpha"),
             "output_speed": tts_cfg.get("output_speed"),
         },
-        "asr": {
-            "preset": raw_tts.get("asr_preset") or raw_tts.get("speech_preset"),
-            "engine": _clean_meta_value(run.get("asr_engine")),
-            "time_sec": _clean_meta_value(run.get("asr_time_sec")),
-        },
+        "asr": _asr_meta_block(run, raw_tts),
         "translation": {
             "mode": translation_mode,
             "provider": translation.get("provider") or raw_tts.get("translation_provider"),
@@ -229,6 +236,9 @@ def _latest_dubbing_metadata(
         "background": {
             "enabled": bool(bg_meta.get("enabled")),
             "source": bg_meta.get("source"),
+            # Lưu lại để regenerate từng đoạn trộn ra đúng cân bằng như lần dub
+            # đầu, thay vì rơi về mặc định config và lệch tiếng giữa các đoạn.
+            "original_voice_percent": bg_meta.get("original_voice_percent"),
         },
         "timing": {
             "merge_max_chars": tts_cfg.get("merge_max_chars"),
@@ -251,32 +261,66 @@ def _set_latest_run_id(vid: str, run_id: str) -> None:
     save_metadata(vid, metadata)
 
 
+@dataclass
+class MixSources:
+    """Ba nguồn audio + gain đã chốt cho một lần mux video.
+
+    ``bed`` = nhạc nền (stem ``no_vocals``), ``voice`` = giọng gốc (stem
+    ``vocals``). Cả hai đều có thể None: người dùng bỏ nhạc nền, bỏ giọng gốc,
+    hoặc bỏ cả hai (chỉ còn giọng dub).
+    """
+    dub_volume: float
+    meta: dict
+    bed: str | None = None
+    bed_volume: float = 0.0
+    voice: str | None = None
+    voice_volume: float = 0.0
+
+
 @contextmanager
 def _merge_background_config(
     vid: str,
-    url: str,
     original_audio: str,
     tts_cfg: dict | None = None,
     *,
-    metadata: dict | None = None,
     on_progress: Optional[Callable[[str], None]] = None,
-) -> Iterator[tuple[str, float, float, dict]]:
-    """Return audio bed path/volumes and metadata for final video mix."""
+) -> Iterator[MixSources]:
+    """Chốt 3 nguồn audio (giọng dub / giọng gốc / nhạc nền) cho lần mux cuối.
+
+    Hai lựa chọn của người dùng là ĐỘC LẬP với nhau:
+
+    - ``keep_background``        -> nhạc nền có vào mix không
+    - ``original_voice_percent`` -> giọng gốc to nhỏ thế nào (0 = bỏ)
+
+    Demucs là CƠ CHẾ phục vụ cả hai (một lần chạy ra cả hai stem), nên nó chạy
+    khi cần bất kỳ nửa nào — không phải một lựa chọn riêng của nhạc nền. Chỉ khi
+    người dùng bỏ cả hai thì mới không cần tách, và lúc đó cũng không còn gì để
+    cân với giọng dub nên bỏ luôn được cả bước đo.
+    """
     from backend.services.dubbing.background import best_demucs_device, ensure_background_audio
+    from backend.services.dubbing.common import voice_percent_to_gain
 
     cfg = dict(tts_cfg or {})
-    # Mặc định TẮT nhạc nền (Demucs tách nền tốn thêm vài phút/video) — người
-    # dùng chủ động bật. Regenerate video cũ không đi qua default này: nó đọc
-    # background.enabled từ metadata của chính video đó.
-    keep_background = bool(cfg.get("keep_background", False))
     mix_cfg = CFG.mix
-    if not keep_background:
-        yield original_audio, mix_cfg.original_volume, mix_cfg.dub_volume_no_background, {
-            "enabled": False,
-            "source": "original_audio",
-            "original_volume": mix_cfg.original_volume,
-            "dub_volume": mix_cfg.dub_volume_no_background,
-        }
+    keep_background = bool(cfg.get("keep_background", False))
+    voice_percent = cfg.get("original_voice_percent")
+    if voice_percent is None:
+        voice_percent = mix_cfg.original_voice_percent
+    voice_percent = min(max(float(voice_percent), 0.0), 100.0)
+    voice_volume = voice_percent_to_gain(voice_percent)
+
+    if not keep_background and voice_percent <= 0:
+        # Không nhạc nền, không giọng gốc -> chỉ còn giọng dub. Bỏ qua Demucs
+        # (tiết kiệm vài phút) và không trộn nền nào vào.
+        yield MixSources(
+            dub_volume=mix_cfg.dub_volume_no_background,
+            meta={
+                "enabled": False,
+                "source": "none",
+                "dub_volume": mix_cfg.dub_volume_no_background,
+                "original_voice_percent": 0.0,
+            },
+        )
         return
 
     # Quyết định GPU/CPU cho tách nhạc nền theo VRAM người dùng khai ở bước cấu
@@ -287,19 +331,34 @@ def _merge_background_config(
         cfg.get("background_device"),
         vram_gb=cfg.get("background_vram_gb"),
     )
+
+    # Luôn lấy stem giọng gốc, kể cả percent = 0: nó là MỐC đo độ to để canh
+    # giọng dub (xem merge_video_audio). Nhờ vậy kéo thanh giọng gốc chỉ đổi mỗi
+    # giọng gốc, không kéo theo độ to của giọng dub. Demucs sinh sẵn stem này
+    # trong cùng một lần chạy nên không tốn thêm thời gian tách.
     with ensure_background_audio(
         vid,
         original_audio,
         cache_path=BACKGROUND_DIR / f"{vid}.wav",
         device=demucs_device,
+        need_vocals=True,
         on_progress=on_progress,
-    ) as bg_path:
-        yield str(bg_path), mix_cfg.background_volume, mix_cfg.dub_volume_with_background, {
-            "enabled": True,
-            "source": "demucs",
-            "background_volume": mix_cfg.background_volume,
-            "dub_volume": mix_cfg.dub_volume_with_background,
-        }
+    ) as (bg_path, voice_path):
+        yield MixSources(
+            bed=str(bg_path) if keep_background else None,
+            bed_volume=mix_cfg.background_volume,
+            dub_volume=mix_cfg.dub_volume_with_background,
+            voice=str(voice_path) if voice_path else None,
+            voice_volume=voice_volume,
+            meta={
+                "enabled": keep_background,
+                "source": "demucs",
+                "background_volume": mix_cfg.background_volume if keep_background else 0.0,
+                "dub_volume": mix_cfg.dub_volume_with_background,
+                "original_voice_percent": voice_percent,
+                "original_voice_volume": voice_volume,
+            },
+        )
 
 
 # ── Thư viện ─────────────────────────────────────────────────────────────────────
@@ -356,6 +415,8 @@ def list_drafts() -> list[dict]:
 
 def delete_library_video(vid: str) -> dict:
     """Delete one library item and its cached/generated files."""
+    from backend.services.dubbing.background import vocals_cache_path
+
     if not re.fullmatch(r"[A-Za-z0-9_-]+", vid or ""):
         raise ValueError("Video id không hợp lệ.")
 
@@ -366,6 +427,7 @@ def delete_library_video(vid: str) -> dict:
         audio_dub_path(vid),
         video_dub_path(vid),
         BACKGROUND_DIR / f"{vid}.wav",
+        vocals_cache_path(BACKGROUND_DIR / f"{vid}.wav"),
         PROJECT_ROOT / "data" / "voice_clones" / f"{vid}.wav",
     ]
     candidates.extend(CFG.paths.audio_dir.glob(f"{vid}.*"))
@@ -399,6 +461,10 @@ def load_video(
     on_progress: Optional[Callable[[str], None]] = None,
     tts_engine: str = "supertonic",
     whisper_preset: str | None = None,
+    manual_batch_size: int | None = None,
+    api_batch_size: int | None = None,
+    sentence_split_mode: str | None = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> dict:
     """Fetch transcript + metadata (có cache), build prompts dịch.
 
@@ -415,6 +481,12 @@ def load_video(
     from backend.services.dubbing import run_log
 
     def progress(msg: str):
+        # Checkpoint hủy nằm NGAY TRONG hàm báo tiến độ: hàm này được truyền
+        # xuyên suốt xuống tận vòng lặp segment của Whisper (gọi mỗi 2%), nên
+        # hủy giữa lúc STT chạy vẫn dừng trong vài giây mà không phải thêm
+        # tham số should_cancel cho cả tầng transcript.
+        if should_cancel and should_cancel():
+            raise LoadCancelled()
         if on_progress:
             on_progress(msg)
 
@@ -434,12 +506,26 @@ def load_video(
     created_current_run = False
 
     try:
+        # Hủy trước khi tốn công gì: yt-dlp tải audio bên trong fetch_transcript
+        # không phát tiến độ nên không có checkpoint nào suốt đoạn đó.
+        progress("Chuẩn bị nạp video")
         transcript_started = time.perf_counter()
-        fetch_transcript(
+        # "complete" = ưu tiên câu trọn vẹn, tắt gần hẳn cắt-theo-pause; mọi
+        # giá trị khác (kể cả None) = mặc định "khớp hình" (config.yaml).
+        is_complete_mode = sentence_split_mode == "complete"
+        _, transcript_source = fetch_transcript(
             url,
             languages=["en"],
-            on_progress=on_progress,
+            # progress (không phải on_progress) -> mỗi lần Whisper báo % là một
+            # cơ hội hủy.
+            on_progress=progress,
             whisper_preset=whisper_preset,
+            sentence_pause_alpha=(
+                CFG.whisper.sentence_pause_alpha_complete if is_complete_mode else None
+            ),
+            caption_pause_alpha=(
+                CFG.whisper.caption_sentence_pause_alpha_complete if is_complete_mode else None
+            ),
         )
         transcript_time = time.perf_counter() - transcript_started
         progress("Lấy thông tin video")
@@ -447,12 +533,24 @@ def load_video(
         ensure_metadata_chapters(url)
         metadata = load_metadata(vid)
 
+        # Ghi nhớ transcript đến từ đâu (manual sub của kênh hay Whisper STT)
+        # — quyết định hiển thị "ASR" hay "Phụ đề nguồn" ở trang video sau khi
+        # dub. "cache" = file đã có sẵn, giữ nguyên giá trị lần fetch trước.
+        if transcript_source in ("manual_sub", "whisper"):
+            metadata["transcript_source"] = transcript_source
+            save_metadata(vid, metadata)
+        else:
+            transcript_source = metadata.get("transcript_source")
+
         if not run_id:
             run_id = run_log.create_run(
                 video_id=vid,
                 duration_min=_duration_min(metadata),
                 mode=mode,
-                asr_engine=_asr_engine(whisper_preset),
+                # Chỉ ghi engine Whisper khi Whisper THẬT SỰ chạy — manual sub
+                # trước đây vẫn bị ghi preset đã chọn, gây hiển thị sai.
+                asr_engine=("manual_sub" if transcript_source == "manual_sub"
+                            else _asr_engine(whisper_preset)),
                 asr_time_sec=transcript_time,
                 total_time_sec=time.perf_counter() - started,
                 status="loaded",
@@ -461,15 +559,34 @@ def load_video(
         _set_latest_run_id(vid, run_id)
 
         progress("Tạo prompts")
+        # Client có thể override số câu/prompt cho MỖI chế độ dịch riêng —
+        # clamp về khoảng hợp lý, bỏ qua giá trị vô lý thay vì raise lỗi giữa
+        # chừng load.
+        resolved_manual_batch_size = CFG.translation.manual_batch_size
+        if (
+            manual_batch_size is not None
+            and CFG.translation.manual_min_batch_size
+            <= int(manual_batch_size)
+            <= CFG.translation.manual_max_batch_size
+        ):
+            resolved_manual_batch_size = int(manual_batch_size)
+        resolved_api_batch_size = CFG.translation.api_batch_size
+        if (
+            api_batch_size is not None
+            and CFG.translation.api_min_batch_size
+            <= int(api_batch_size)
+            <= CFG.translation.api_max_batch_size
+        ):
+            resolved_api_batch_size = int(api_batch_size)
         prompts = create_translation_prompts(
             str(metadata_path(vid)),
             str(raw_subtitles_path(vid)),
-            batch_size=CFG.translation.manual_batch_size,
+            batch_size=resolved_manual_batch_size,
         )
         api_prompts = create_translation_prompts(
             str(metadata_path(vid)),
             str(raw_subtitles_path(vid)),
-            batch_size=CFG.translation.api_batch_size,
+            batch_size=resolved_api_batch_size,
             max_chars_per_batch=CFG.translation.api_max_chars_per_batch,
         )
         chapter_prompt = build_chapter_translation_prompt(metadata)
@@ -483,9 +600,12 @@ def load_video(
             "api_prompts": api_prompts,
             "chapter_prompt": chapter_prompt,
             "translation_batching": {
-                "manual_batch_size": CFG.translation.manual_batch_size,
-                "api_batch_size": CFG.translation.api_batch_size,
+                "manual_batch_size": resolved_manual_batch_size,
+                "manual_min_batch_size": CFG.translation.manual_min_batch_size,
+                "manual_max_batch_size": CFG.translation.manual_max_batch_size,
+                "api_batch_size": resolved_api_batch_size,
                 "api_min_batch_size": CFG.translation.api_min_batch_size,
+                "api_max_batch_size": CFG.translation.api_max_batch_size,
                 "api_max_chars_per_batch": CFG.translation.api_max_chars_per_batch,
                 "api_concurrency": CFG.translation.api_concurrency,
                 "api_job_timeout_sec": CFG.translation.api_job_timeout_sec,
@@ -662,6 +782,20 @@ _REGENERATE_LOCKS: dict[str, threading.Lock] = {}
 _DUB_LOCKS: dict[str, threading.Lock] = {}
 
 
+class LoadCancelled(Exception):
+    """Ném ra khi người dùng hủy bước nạp video giữa chừng.
+
+    Cùng kiểu hủy HỢP TÁC như ``DubCancelled``: không kill được thread, nên
+    ``load_video`` kiểm tra cờ ở checkpoint rồi thoát sạch. Checkpoint chính
+    nằm ngay trong hàm báo tiến độ — Whisper gọi nó mỗi 2%, nên hủy giữa lúc
+    STT chạy vẫn dừng trong vài giây thay vì phải chờ hết video.
+
+    Load không ghi metadata cho tới khi transcript xong, và các file đã tải
+    (audio/subtitle) đều là cache dùng lại được, nên hủy giữa chừng không để
+    lại trạng thái hỏng.
+    """
+
+
 class DubCancelled(Exception):
     """Ném ra khi người dùng yêu cầu hủy dubbing giữa chừng.
 
@@ -673,7 +807,6 @@ class DubCancelled(Exception):
 
 
 def list_tts_models() -> dict:
-    omni_budget = CFG.tts.omnivoice_budget
     whisper_presets = []
     for preset_id, preset in (CFG.whisper.presets or {}).items():
         whisper_presets.append({
@@ -692,6 +825,9 @@ def list_tts_models() -> dict:
         "models": CFG.tts.models,
         "default_engine": "supertonic",
         "default_speech_preset": CFG.whisper.default_preset,
+        # Mặc định thanh "giọng gốc" — lấy từ config.yaml để UI và backend dùng
+        # CHUNG một nguồn, đổi số trong config là UI đổi theo.
+        "default_original_voice_percent": CFG.mix.original_voice_percent,
         "speech_presets": whisper_presets,
         "engines": [
             {
@@ -702,15 +838,6 @@ def list_tts_models() -> dict:
                 "default_model": CFG.tts.default_model,
                 "devices": ["cpu"],
                 "supports_clone": False,
-                "supports_instruction": False,
-                "budget_policy": {
-                    "source_units_per_sec": omni_budget.source_units_per_sec,
-                    "min_units_per_sec": omni_budget.min_units_per_sec,
-                    "target_units_per_sec": omni_budget.target_units_per_sec,
-                    "max_units_per_sec": omni_budget.max_units_per_sec,
-                    "tolerance_ratio": omni_budget.tolerance_ratio,
-                    "tolerance_min": omni_budget.tolerance_min,
-                },
             },
             {
                 "id": "omnivoice",
@@ -720,17 +847,6 @@ def list_tts_models() -> dict:
                 "default_model": CFG.tts.omnivoice_model,
                 "devices": ["cuda"],
                 "supports_clone": True,
-                "supports_instruction": True,
-                "voice_modes": ["default", "design", "clone"],
-                "instruction_options": OMNIVOICE_INSTRUCTION_OPTIONS,
-                "budget_policy": {
-                    "source_units_per_sec": omni_budget.source_units_per_sec,
-                    "min_units_per_sec": omni_budget.min_units_per_sec,
-                    "target_units_per_sec": omni_budget.target_units_per_sec,
-                    "max_units_per_sec": omni_budget.max_units_per_sec,
-                    "tolerance_ratio": omni_budget.tolerance_ratio,
-                    "tolerance_min": omni_budget.tolerance_min,
-                },
                 "default_voice_id": "academic_male",
                 "voices": [
                     {"id": voice.get("id"), "label": voice.get("label", voice.get("id"))}
@@ -757,6 +873,20 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         raise ValueError(f"TTS engine không hợp lệ: {engine!r}")
     # Mặc định TẮT nhạc nền — đồng bộ với DEFAULT_TTS_CONFIG phía frontend.
     keep_background = bool(cfg.get("keep_background", False))
+    # Thanh "giọng gốc" 0-100 (chỉ có tác dụng khi tách nền). None = client
+    # không gửi field này -> lấy mặc định config, tức dub MỚI cư xử như UI hiện
+    # tại. Các luồng tạo lại/dub lại video cũ KHÔNG rơi vào nhánh này: chúng
+    # đọc qua _stored_voice_percent() và ra 0 để giữ đúng bản mix ban đầu.
+    raw_voice_percent = cfg.get("original_voice_percent")
+    if raw_voice_percent in (None, ""):
+        original_voice_percent = CFG.mix.original_voice_percent
+    else:
+        try:
+            original_voice_percent = float(raw_voice_percent)
+        except (TypeError, ValueError):
+            raise ValueError("original_voice_percent phải là số trong khoảng 0-100.")
+        if not 0 <= original_voice_percent <= 100:
+            raise ValueError("original_voice_percent phải nằm trong khoảng 0-100.")
     # VRAM người dùng khai ở bước cấu hình phần cứng — quyết định tách nhạc nền
     # (Demucs) chạy GPU hay CPU, độc lập với engine TTS. Giữ None nếu UI không
     # gửi (vd luồng cũ) để best_demucs_device xét theo GPU thật.
@@ -779,9 +909,9 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
             "voice_id": None,
             "reference_audio_id": None,
             "reference_text": "",
-            "instruction": "",
             "num_step": num_step,
             "keep_background": keep_background,
+            "original_voice_percent": original_voice_percent,
             "background_vram_gb": background_vram_gb,
         }
 
@@ -793,7 +923,7 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         raise ValueError("OmniVoice num_step phải là 16, 24, 32 hoặc 48.")
     preset_id = None
     voice_mode = str(cfg.get("voice_mode") or "default")
-    if voice_mode not in {"default", "design", "clone"}:
+    if voice_mode not in {"default", "clone"}:
         raise ValueError(f"OmniVoice mode không hợp lệ: {voice_mode!r}")
     voice_id = cfg.get("voice_id") or "academic_male"
     voice = {}
@@ -805,20 +935,6 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         if voice is None:
             raise ValueError(f"OmniVoice voice không hợp lệ: {voice_id!r}")
         voice_mode = "clone"
-    raw_instruction_tags = cfg.get("instruction_tags") or []
-    if isinstance(raw_instruction_tags, str):
-        raw_instruction_tags = [raw_instruction_tags]
-    instruction_tags = [
-        str(tag) for tag in raw_instruction_tags
-        if tag and str(tag) in OMNIVOICE_INSTRUCTION_TAGS
-    ]
-    invalid_tags = [
-        str(tag) for tag in raw_instruction_tags
-        if tag and str(tag) not in OMNIVOICE_INSTRUCTION_TAGS
-    ]
-    if invalid_tags:
-        raise ValueError(f"OmniVoice instruction không hợp lệ: {', '.join(invalid_tags)}")
-    instruction = ", ".join(instruction_tags)
     return {
         "engine": engine,
         "model": model,
@@ -834,8 +950,6 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
             None
         ),
         "reference_text": cfg.get("reference_text") or cfg.get("ref_text") or voice.get("reference_text") or "",
-        "instruction": instruction or voice.get("instruction") or "",
-        "instruction_tags": instruction_tags,
         "language": cfg.get("language") or "vi",
         **TTS_POLICIES["omnivoice"],
         "num_step": num_step,
@@ -843,6 +957,7 @@ def resolve_tts_config(tts: dict | None = None, tts_model: str | None = None) ->
         # detect) — ưu tiên nó; 0/thiếu = auto theo VRAM detect lúc synth.
         "batch_size": int(cfg.get("batch_size") or 0) or TTS_POLICIES["omnivoice"]["batch_size"],
         "keep_background": keep_background,
+        "original_voice_percent": original_voice_percent,
         "background_vram_gb": background_vram_gb,
     }
 
@@ -958,6 +1073,7 @@ def regenerate_full_dubbing(
         "speed_alpha": tts_meta.get("speed_alpha"),
         "output_speed": tts_meta.get("output_speed"),
         "keep_background": bool(background_meta.get("enabled", True)),
+        "original_voice_percent": _stored_voice_percent(background_meta),
         "translation": translation_meta,
         "asr_preset": asr_meta.get("preset"),
     }
@@ -981,7 +1097,7 @@ def regenerate_supertonic_segment(
     from backend.services.dubbing.text_normalizer import (
         apply_pronunciation_map,
         canonicalize_text,
-        normalize_for_engine,
+        normalize_for_tts,
     )
     from backend.services.dubbing.translation_prepare import NORMALIZATION_VERSION
     from backend.services.youtube.download import download_audio, download_video
@@ -1011,8 +1127,8 @@ def regenerate_supertonic_segment(
 
         text_vi = canonicalize_text(text_vi)
         text_tts, pronunciation_map = apply_pronunciation_map(text_vi, pronunciation_map)
-        text_tts, applied_rules = normalize_for_engine(
-            text_tts, "supertonic", glossary=load_glossary(),
+        text_tts, applied_rules = normalize_for_tts(
+            text_tts, glossary=load_glossary(),
         )
         written_units = count_spoken_units(text_vi)
         spoken_units = count_spoken_units(text_tts)
@@ -1044,7 +1160,9 @@ def regenerate_supertonic_segment(
         metadata = load_metadata(vid)
         url = metadata.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
         original_audio = download_audio(url)
-        config["keep_background"] = bool(_background_meta(metadata).get("enabled", True))
+        _bg = _background_meta(metadata)
+        config["keep_background"] = bool(_bg.get("enabled", True))
+        config["original_voice_percent"] = _stored_voice_percent(_bg)
 
         token = uuid.uuid4().hex
         candidate_audio_path = AUDIO_DUB_DIR / f".{vid}.{token}.wav"
@@ -1114,20 +1232,20 @@ def regenerate_supertonic_segment(
             output_speed = _segment_output_speed(segment, TTS_POLICIES["supertonic"]["output_speed"])
             with _merge_background_config(
                 vid,
-                url,
                 original_audio,
                 config,
-                metadata=metadata,
                 on_progress=lambda msg: r(72, msg),
-            ) as (audio_bed, bed_volume, dub_volume, _bg_meta):
+            ) as mix:
                 merge_video_audio(
                     video_path=download_video(url),
                     audio_dub=str(candidate_audio_path),
-                    audio_original=audio_bed,
                     output_path=str(candidate_video_path),
-                    original_volume=bed_volume,
-                    dub_volume=dub_volume,
+                    audio_bed=mix.bed,
+                    bed_volume=mix.bed_volume,
+                    dub_volume=mix.dub_volume,
                     playback_speed=output_speed,
+                    audio_voice=mix.voice,
+                    voice_volume=mix.voice_volume,
                 )
 
             speech_duration = round(speech_samples / sample_rate, 3)
@@ -1196,7 +1314,7 @@ def regenerate_omnivoice_segment(
     from backend.services.dubbing.text_normalizer import (
         apply_pronunciation_map,
         canonicalize_text,
-        normalize_for_engine,
+        normalize_for_tts,
     )
     from backend.services.dubbing.translation_prepare import NORMALIZATION_VERSION
     from backend.services.youtube.download import download_audio, download_video
@@ -1226,8 +1344,8 @@ def regenerate_omnivoice_segment(
 
         text_vi = canonicalize_text(text_vi)
         text_tts, pronunciation_map = apply_pronunciation_map(text_vi, pronunciation_map)
-        text_tts, applied_rules = normalize_for_engine(
-            text_tts, "omnivoice", glossary=load_glossary(),
+        text_tts, applied_rules = normalize_for_tts(
+            text_tts, glossary=load_glossary(),
         )
         written_units = count_spoken_units(text_vi)
         spoken_units = count_spoken_units(text_tts)
@@ -1262,13 +1380,14 @@ def regenerate_omnivoice_segment(
             "device": stored_tts.get("device"),
             "voice_mode": stored_tts.get("mode"),
             "voice_id": stored_tts.get("voice_id"),
-            "instruction_tags": stored_tts.get("instruction_tags") or [],
             "num_step": num_step,
         })
         metadata = load_metadata(vid)
         url = metadata.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
         original_audio = download_audio(url)
-        config["keep_background"] = bool(_background_meta(metadata).get("enabled", True))
+        _bg = _background_meta(metadata)
+        config["keep_background"] = bool(_bg.get("enabled", True))
+        config["original_voice_percent"] = _stored_voice_percent(_bg)
         if config.get("reference_source") == "video":
             reference_path = PROJECT_ROOT / "data" / "voice_clones" / f"{vid}.wav"
             reference_audio, reference_text = prepare_source_voice_reference(
@@ -1328,20 +1447,20 @@ def regenerate_omnivoice_segment(
             output_speed = _segment_output_speed(segment, 1.0)
             with _merge_background_config(
                 vid,
-                url,
                 original_audio,
                 config,
-                metadata=metadata,
                 on_progress=lambda msg: r(72, msg),
-            ) as (audio_bed, bed_volume, dub_volume, _bg_meta):
+            ) as mix:
                 merge_video_audio(
                     video_path=download_video(url),
                     audio_dub=str(candidate_audio_path),
-                    audio_original=audio_bed,
                     output_path=str(candidate_video_path),
-                    original_volume=bed_volume,
-                    dub_volume=dub_volume,
+                    audio_bed=mix.bed,
+                    bed_volume=mix.bed_volume,
+                    dub_volume=mix.dub_volume,
                     playback_speed=output_speed,
+                    audio_voice=mix.voice,
+                    voice_volume=mix.voice_volume,
                 )
 
             segment["text_vi"] = text_vi
@@ -1563,26 +1682,27 @@ def _run_dubbing_impl(
         original_audio_path = original_audio or download_audio(url)
         with _merge_background_config(
             vid,
-            url,
             original_audio_path,
             tts_cfg,
-            metadata=metadata,
             on_progress=lambda msg: r(82, msg),
-        ) as (audio_bed, bed_volume, dub_volume, bg_meta):
+        ) as mix:
             # Đặt SAU khi tách nhạc nền xong (with-block chỉ vào tới đây khi
             # Demucs/cache bên trong _merge_background_config đã chạy hết) ->
             # thứ tự stage luôn đơn điệu: [Tách nhạc nền ->] Trộn video ->
             # Hoàn tất. Frontend dựa vào đúng chữ này để chọn ô đang chạy
             # trong chuỗi bước hiển thị.
             r(82, "Tải & trộn video")
+            bg_meta = mix.meta
             merge_video_audio(
                 video_path=download_video(url),
                 audio_dub=audio_dub,
-                audio_original=audio_bed,
                 output_path=str(video_dub_path(vid)),
-                original_volume=bed_volume,
-                dub_volume=dub_volume,
+                audio_bed=mix.bed,
+                bed_volume=mix.bed_volume,
+                dub_volume=mix.dub_volume,
                 playback_speed=output_speed,
+                audio_voice=mix.voice,
+                voice_volume=mix.voice_volume,
             )
     except DubCancelled:
         raise

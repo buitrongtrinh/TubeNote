@@ -14,14 +14,23 @@ const DEFAULT_TTS_CONFIG = {
   voice_id: "",
   reference_audio_id: "",
   reference_text: "",
-  instruction: "",
-  instruction_tags: [],
   num_step: 8,
   // Mặc định TẮT nhạc nền: tách nền chạy Demucs mất thêm vài phút mỗi video,
   // người dùng chủ động bật khi cần thay vì phải nhớ tắt.
   keep_background: false,
+  // KHÔNG đặt original_voice_percent ở đây: để trống thì nơi hiển thị/gửi đi
+  // tự lấy mặc định backend qua clampVoicePercent(). Đặt số cứng vào đây sẽ
+  // được autosave ghi vào draft và che mất mặc định thật trong config.yaml.
   batch_size: 0, // 0 = auto theo VRAM detect; >0 = từ VRAM người dùng nhập
 };
+
+// Mặc định thanh "giọng gốc" do backend quyết (mix.original_voice_percent trong
+// config.yaml), nạp ở effect fetch /api/tts/models. Giữ ở module scope vì
+// clampVoicePercent() là nơi MỌI đường khởi tạo config rơi về khi thiếu field
+// (draft cũ lưu trước khi có thanh này, đổi engine TTS, payload luồng cũ...) —
+// để một chỗ thì đổi số trong config.yaml là toàn bộ UI đổi theo.
+const VOICE_PERCENT_PLACEHOLDER = 50;   // chỉ dùng trong lúc chờ fetch
+let backendVoicePercentDefault = VOICE_PERCENT_PLACEHOLDER;
 
 const TTS_QUALITY_OPTIONS = {
   supertonic: [
@@ -59,9 +68,14 @@ const DEFAULT_API_CONCURRENCY = 8;
 const API_STATUS_TIMEOUT_MS = 15000;
 const MIN_API_JOB_TIMEOUT_SEC = 30;
 const DEFAULT_TRANSLATION_BATCHING = {
-  manual_batch_size: 50,
-  api_batch_size: 25,
+  // Hai giá trị hiển thị lấy từ backend/config.yaml. null giúp lần load diễn
+  // ra trước khi request cấu hình hoàn tất vẫn để backend tự chọn mặc định.
+  manual_batch_size: null,
+  manual_min_batch_size: null,
+  manual_max_batch_size: null,
+  api_batch_size: null,
   api_min_batch_size: API_RETRY_MIN_BATCH_SIZE,
+  api_max_batch_size: null,
   api_max_chars_per_batch: 4000,
   api_concurrency: DEFAULT_API_CONCURRENCY,
   api_job_timeout_sec: 300,
@@ -117,6 +131,23 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function optionalBatchSize(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
+function batchSizeWithinBounds(value, min, max) {
+  if (String(value ?? "").trim() === "") return true;
+  const number = Number(value);
+  const hasMin = String(min ?? "").trim() !== "" && Number.isFinite(Number(min));
+  const hasMax = String(max ?? "").trim() !== "" && Number.isFinite(Number(max));
+  return (
+    Number.isInteger(number)
+    && (!hasMin || number >= Number(min))
+    && (!hasMax || number <= Number(max))
+  );
+}
+
 function withTimeout(promise, timeoutMs, message) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
@@ -138,45 +169,6 @@ function hasDraftWork({ responses, validated, chapterResponse, chapterValidation
     Boolean(dubJobId) ||
     Boolean(dubbing)
   );
-}
-
-const DEFAULT_OMNI_BUDGET_POLICY = {
-  source_units_per_sec: 6.0,
-  min_units_per_sec: 3.2,
-  max_units_per_sec: 5.2,
-  tolerance_ratio: 0.4,
-  tolerance_min: 3,
-};
-
-function omniBudgetLabel(budget, policy = DEFAULT_OMNI_BUDGET_POLICY) {
-  const sourceRate = Number(policy.source_units_per_sec) || DEFAULT_OMNI_BUDGET_POLICY.source_units_per_sec;
-  const minRate = Number(policy.min_units_per_sec) || DEFAULT_OMNI_BUDGET_POLICY.min_units_per_sec;
-  const maxRate = Number(policy.max_units_per_sec) || DEFAULT_OMNI_BUDGET_POLICY.max_units_per_sec;
-  const toleranceRatio = Number(policy.tolerance_ratio) || DEFAULT_OMNI_BUDGET_POLICY.tolerance_ratio;
-  const toleranceMin = Number(policy.tolerance_min) || DEFAULT_OMNI_BUDGET_POLICY.tolerance_min;
-  const duration = Math.max(0.1, Number(budget || 0) / sourceRate);
-  const min = Math.max(1, Math.floor(duration * minRate));
-  const baseMax = Math.max(2, Math.floor(duration * maxRate));
-  const tolerance = Math.max(toleranceMin, Math.ceil(baseMax * toleranceRatio));
-  const max = baseMax + tolerance;
-  return `[${min}-${max} tiếng]`;
-}
-
-function promptForEngine(prompt, engine, policy) {
-  return prompt
-    .replace(/\[≤\s*(\d+)\s*tiếng\]/g, (_, budget) => omniBudgetLabel(Number(budget), policy))
-    .replace(
-      "- Không chép ký hiệu \"[≤N tiếng]\" vào bản dịch.\n",
-      "- Không chép marker \"[A-B tiếng]\" vào bản dịch.\n",
-    )
-    .replace(
-      /2\. VỪA THỜI LƯỢNG[\s\S]*?(?=3\. DỊCH TỰ NHIÊN VÀ NHẤT QUÁN)/,
-      "2. VỪA THỜI LƯỢNG CHO TTS\n- \"[A-B tiếng]\" là khoảng độ dài nên dùng cho dòng đó; B là giới hạn tối đa bắt buộc.\n- Một \"tiếng\" là một cụm được tách bằng khoảng trắng trong bản dịch tiếng Việt.\n- Sau khi dịch mỗi dòng, tự đếm số tiếng. Nếu vượt B, phải tự rút gọn dòng đó trước khi trả lời.\n- Cố gắng nằm trong khoảng A-B nếu vẫn đủ ý; với câu rất ngắn, được thấp hơn A nếu tự nhiên hơn.\n- Với slot rất ngắn, dùng cụm cực ngắn, có thể giữ thuật ngữ tiếng Anh nếu ngắn hơn bản Việt.\n- Nếu câu nguồn dài, bỏ từ đệm và ý phụ; không diễn giải thêm, không thêm ví dụ, không thêm chủ ngữ nếu không cần.\n\n",
-    )
-    .replace(
-      "mỗi câu không vượt ngân sách.",
-      "mỗi câu không vượt giới hạn B trong marker [A-B tiếng].",
-    );
 }
 
 function promptLines(prompt) {
@@ -220,6 +212,14 @@ function responseFromSegments(promptIndex, segments) {
   ].join("\n");
 }
 
+function clampVoicePercent(value) {
+  // Thiếu/không phải số -> về mặc định backend thay vì 0, để cấu hình cũ (lưu
+  // trước khi có thanh này) không bị hiểu nhầm thành "tắt hẳn giọng gốc".
+  const num = Number(value);
+  if (!Number.isFinite(num)) return backendVoicePercentDefault;
+  return Math.min(100, Math.max(0, Math.round(num)));
+}
+
 function normalizeTtsConfig(value, fallbackModel = "M5", fallbackEngine = "supertonic") {
   const cfg = value && typeof value === "object" ? value : {};
   const engine = cfg.engine || fallbackEngine;
@@ -237,10 +237,17 @@ function normalizeTtsConfig(value, fallbackModel = "M5", fallbackEngine = "super
     voice_id: cfg.voice_id || "",
     reference_audio_id: cfg.reference_audio_id || "",
     reference_text: cfg.reference_text || "",
-    instruction: cfg.instruction || "",
-    instruction_tags: Array.isArray(cfg.instruction_tags) ? cfg.instruction_tags : [],
     num_step: numStep,
     keep_background: cfg.keep_background === true,
+    // CHỈ giữ khi thật sự có số — không ép mặc định ở đây. Hàm này chạy cả lúc
+    // khôi phục draft (đồng bộ, ngay khi mount) khi /api/tts/models CHƯA trả về,
+    // nên ép mặc định lúc đó là nướng cứng giá trị tạm vào state, rồi effect
+    // autosave ghi ngược vào localStorage -> mặc định thật trong config.yaml
+    // vĩnh viễn không áp được nữa. Để undefined thì nơi hiển thị/gửi đi tự gọi
+    // clampVoicePercent() và luôn lấy giá trị backend mới nhất.
+    original_voice_percent: Number.isFinite(Number(cfg.original_voice_percent))
+      ? clampVoicePercent(cfg.original_voice_percent)
+      : undefined,
     batch_size: Number(cfg.batch_size) > 0 ? Math.floor(Number(cfg.batch_size)) : 0,
   };
 }
@@ -258,9 +265,7 @@ function ttsConfigForEngine(engine, fallbackModels = ["M5"]) {
     voice_id: engine?.default_voice_id || "",
     reference_audio_id: "",
     reference_text: "",
-    instruction: "",
-    instruction_tags: [],
-    num_step: defaultNumStepForEngine(engineId),
+        num_step: defaultNumStepForEngine(engineId),
     keep_background: false,
   }, model, engineId);
 }
@@ -290,15 +295,15 @@ const DUB_STEPS = [
   { key: "done", label: "Hoàn tất" },
 ];
 
-// Bật "Giữ nhạc nền" thì Demucs tách nhạc nền chạy TRONG mốc 82% (cùng % với
-// "Trộn video"), có thể đứng đó vài phút -> tách riêng 1 ô để không tưởng bị
-// treo. _run_dubbing_impl luôn gửi "Tách nhạc nền..."/"...(cache)" TRƯỚC rồi
-// mới gửi "Tải & trộn video" (đặt sau khi with-block tách nhạc nền xong) ->
-// thứ tự chữ đơn điệu, dùng an toàn để suy ra đã tách xong hay chưa.
+// Giữ nhạc nền HOẶC giữ giọng gốc đều cần Demucs tách audio gốc, chạy TRONG
+// mốc 82% (cùng % với "Trộn video") và có thể đứng đó vài phút -> tách riêng 1
+// ô để không tưởng bị treo. _run_dubbing_impl luôn gửi "Tách nhạc nền..."/
+// "...(cache)" TRƯỚC rồi mới gửi "Tải & trộn video" (đặt sau khi with-block
+// tách xong) -> thứ tự chữ đơn điệu, dùng an toàn để suy ra đã tách xong chưa.
 const DUB_STEPS_WITH_BG = [
   { key: "prepare", label: "Chuẩn bị" },
   { key: "tts", label: "Tổng hợp giọng nói" },
-  { key: "bg", label: "Tách nhạc nền" },
+  { key: "bg", label: "Tách audio gốc" },
   { key: "merge", label: "Trộn video" },
   { key: "done", label: "Hoàn tất" },
 ];
@@ -307,9 +312,15 @@ function isBackgroundSeparationStage(stage) {
   return /Tách nhạc nền|nhạc nền đã tách/i.test(stage || "");
 }
 
-function dubStepIndex(progress, stage, keepBackground) {
+// Demucs chạy khi cần BẤT KỲ nửa nào của phép tách: nhạc nền để trộn vào, hoặc
+// giọng gốc (dù chỉ để làm mốc canh độ to cho giọng dub).
+function willSeparateAudio(cfg) {
+  return cfg?.keep_background === true || clampVoicePercent(cfg?.original_voice_percent) > 0;
+}
+
+function dubStepIndex(progress, stage, willSeparate) {
   const p = Math.max(0, Math.min(100, Number(progress) || 0));
-  if (!keepBackground) {
+  if (!willSeparate) {
     if (p >= 100) return 3;
     if (p >= 82) return 2;
     if (p >= 5) return 1;
@@ -327,6 +338,10 @@ export default function AddPage() {
   const [loading, setLoading] = useState(false);
   const [loadStage, setLoadStage] = useState("");
   const [loadProgress, setLoadProgress] = useState(0);
+  // job_id của lần nạp đang chạy — cần để gửi yêu cầu hủy. cancellingLoad chỉ
+  // khoá nút, việc dọn UI để vòng poll làm khi thấy status "cancelled".
+  const [loadJobId, setLoadJobId] = useState(null);
+  const [cancellingLoad, setCancellingLoad] = useState(false);
   const [meta, setMeta] = useState(null);
   const [prompts, setPrompts] = useState([]);
   const [apiPrompts, setApiPrompts] = useState([]);
@@ -360,6 +375,11 @@ export default function AddPage() {
   const [ttsConfig, setTtsConfig] = useState(DEFAULT_TTS_CONFIG);
   const [speechPresets, setSpeechPresets] = useState([]);
   const [speechPreset, setSpeechPreset] = useState("cpu");
+  // Chế độ tách câu khi dựng transcript — chọn TRƯỚC khi Load (giống
+  // speechPreset): chỉ có tác dụng cho video chưa có subtitle cache, đổi
+  // mode cho video đã load không tự re-run được (transcript cache chỉ lưu
+  // câu đã dựng sẵn, không lưu mốc từng từ để dựng lại rẻ).
+  const [sentenceSplitMode, setSentenceSplitMode] = useState("sync");
   const [hardware, setHardware] = useState(null);
   const [hwRam, setHwRam] = useState("");
   const [hwVram, setHwVram] = useState("");
@@ -367,6 +387,12 @@ export default function AddPage() {
   const [hwDirty, setHwDirty] = useState(false);
   const [hwDetecting, setHwDetecting] = useState(false);
   const [hwApplying, setHwApplying] = useState(false);
+  // Số câu/prompt mỗi chế độ dịch — nhập tay ở tab "Dịch nội dung", đổi xong
+  // bấm "Dựng lại prompt" để gọi lại /api/load (đọc phụ đề từ cache, chỉ tạo
+  // lại prompt — nhanh). Đồng bộ theo giá trị THẬT đang áp dụng mỗi khi nạp
+  // video (xem chỗ setTranslationBatching trong onLoad).
+  const [manualBatchSize, setManualBatchSize] = useState("");
+  const [apiBatchSize, setApiBatchSize] = useState("");
   // Trạng thái THUẦN hiển thị: khối cấu hình phần cứng gập/mở. Mặc định gập
   // (cấu hình là việc 1 lần mỗi máy); tự mở ở lần đầu khi máy chưa lưu gì.
   // Set trong effect (không phải initializer) để SSR/client render lần đầu
@@ -417,13 +443,19 @@ export default function AddPage() {
 	        const savedTts = saved.ttsConfig || saved.tts || (saved.ttsModel ? { model: saved.ttsModel } : null);
 	        if (savedTts) setTtsConfig(normalizeTtsConfig(savedTts));
 	        if (saved.speechPreset) setSpeechPreset(saved.speechPreset);
+	        if (saved.sentenceSplitMode === "complete" || saved.sentenceSplitMode === "sync") {
+	          setSentenceSplitMode(saved.sentenceSplitMode);
+	        }
 	        if (saved.translationMode === "api" || saved.translationMode === "manual") {
 	          setTranslationMode(saved.translationMode);
 	        }
 	        if (saved.translationProvider) setTranslationProvider(saved.translationProvider);
         if (saved.translationModel) setTranslationModel(saved.translationModel);
         if (saved.translationBatching && typeof saved.translationBatching === "object") {
-          setTranslationBatching({ ...DEFAULT_TRANSLATION_BATCHING, ...saved.translationBatching });
+          const batching = { ...DEFAULT_TRANSLATION_BATCHING, ...saved.translationBatching };
+          setTranslationBatching(batching);
+          setManualBatchSize(batching.manual_batch_size == null ? "" : String(batching.manual_batch_size));
+          setApiBatchSize(batching.api_batch_size == null ? "" : String(batching.api_batch_size));
         }
         // Nháp đã có prompt -> mở lại đúng tab đang làm dở thay vì tab nạp video.
         if (Array.isArray(saved.prompts) && saved.prompts.length) setActiveTab(2);
@@ -490,6 +522,12 @@ export default function AddPage() {
         return;
       }
       const data = modelsRes.value;
+      // Nạp TRƯỚC mọi lệnh dựng config bên dưới — clampVoicePercent() đọc biến
+      // này, nên đặt sau sẽ ra mất một nhịp và UI hiện số cũ.
+      const backendPercent = Number(data.default_original_voice_percent);
+      if (Number.isFinite(backendPercent)) {
+        backendVoicePercentDefault = Math.min(100, Math.max(0, Math.round(backendPercent)));
+      }
       const models = Array.isArray(data.models) ? data.models : [];
       const engines = Array.isArray(data.engines) ? data.engines : [];
       const presets = Array.isArray(data.speech_presets) ? data.speech_presets : [];
@@ -564,10 +602,18 @@ export default function AddPage() {
           default_provider: config?.default_provider || providers[0].id,
           providers,
         };
+        const batching = {
+          ...DEFAULT_TRANSLATION_BATCHING,
+          ...(config?.translation_batching || {}),
+          ...(saved?.translationBatching || {}),
+        };
         const defaultProvider = providers.find((item) => item.id === nextConfig.default_provider) || providers[0];
         const savedProvider = providers.find((item) => item.id === saved?.translationProvider);
         const provider = savedProvider || defaultProvider;
         setTranslationModelConfig(nextConfig);
+        setTranslationBatching(batching);
+        setManualBatchSize(batching.manual_batch_size == null ? "" : String(batching.manual_batch_size));
+        setApiBatchSize(batching.api_batch_size == null ? "" : String(batching.api_batch_size));
         setTranslationProvider(provider.id);
         setTranslationModel(
           provider.models?.includes(saved?.translationModel)
@@ -638,6 +684,7 @@ export default function AddPage() {
       dubJobId,
       ttsConfig,
       speechPreset,
+      sentenceSplitMode,
       translationMode,
       translationProvider,
       translationModel,
@@ -662,6 +709,7 @@ export default function AddPage() {
     dubJobId,
     ttsConfig,
     speechPreset,
+    sentenceSplitMode,
     translationMode,
     translationProvider,
     translationModel,
@@ -708,7 +756,10 @@ export default function AddPage() {
     setDubJobId(null);
     setTranslatingPrompts({});
     setTranslationBatching(DEFAULT_TRANSLATION_BATCHING);
+    setManualBatchSize("");
+    setApiBatchSize("");
     setSpeechPreset(speechPresets.find((preset) => preset.id === "cpu")?.id || speechPresets[0]?.id || "cpu");
+    setSentenceSplitMode("sync");
     const defaultEngine = ttsEngines.find((engine) => engine.id === DEFAULT_TTS_CONFIG.engine) || ttsEngines[0];
     if (defaultEngine) {
       setTtsConfig(ttsConfigForEngine(defaultEngine, ttsModels.length ? ttsModels : ["M5"]));
@@ -757,7 +808,11 @@ export default function AddPage() {
           url,
           selectedTtsEngine.id,
           selectedSpeechPreset.id,
+          optionalBatchSize(manualBatchSize),
+          optionalBatchSize(apiBatchSize),
+          sentenceSplitMode,
         );
+      setLoadJobId(job_id);
       // Polling vì bước Whisper có thể vài phút (tránh timeout).
       while (true) {
         await wait(1500);
@@ -786,11 +841,23 @@ export default function AddPage() {
           setChapterTranslating(false);
           setChapterModalOpen(false);
           setChapterCopied(false);
-          setTranslationBatching({ ...DEFAULT_TRANSLATION_BATCHING, ...(data.translation_batching || {}) });
+          const batching = { ...DEFAULT_TRANSLATION_BATCHING, ...(data.translation_batching || {}) };
+          setTranslationBatching(batching);
+          // Đồng bộ ô nhập ở tab "Dịch nội dung" theo giá trị THẬT vừa áp
+          // dụng (backend bỏ qua số vô lý) — để ô không "nói dối" người dùng.
+          setManualBatchSize(batching.manual_batch_size == null ? "" : String(batching.manual_batch_size));
+          setApiBatchSize(batching.api_batch_size == null ? "" : String(batching.api_batch_size));
           setResponses({});
           setValidated({});
           setExpandedResponses({});
           setTranslatingPrompts({});
+          return;
+        }
+        if (s.status === "cancelled") {
+          // Người dùng chủ động hủy -> không phải lỗi, không hiện báo đỏ.
+          // Giữ nguyên URL đã nhập để bấm Load lại được ngay.
+          setLoadStage("");
+          setLoadProgress(0);
           return;
         }
         if (s.status === "error") {
@@ -802,6 +869,8 @@ export default function AddPage() {
       setError(String(e));
     } finally {
       setLoading(false);
+      setLoadJobId(null);
+      setCancellingLoad(false);
     }
   }
 
@@ -811,10 +880,10 @@ export default function AddPage() {
     onLoad();
   }, [restoredDraft, url, loading, meta, prompts.length]);
 
-  const apiMinBatchSize = Math.max(
-    1,
-    Number(translationBatching.api_min_batch_size) || API_RETRY_MIN_BATCH_SIZE,
-  );
+  // Sàn chia nhỏ khi retry KHÁC với cận dưới ô nhập UI (translationBatching.api_min_batch_size,
+  // giờ cấu hình được và có thể lớn hơn API_RETRY_MIN_BATCH_SIZE) — không dùng chung field,
+  // kẻo config.yaml đặt api_min_batch_size = api_batch_size sẽ tắt luôn khả năng retry-chia-nhỏ.
+  const apiMinBatchSize = API_RETRY_MIN_BATCH_SIZE;
   const apiConcurrency = Math.max(
     1,
     Math.min(64, Number(translationBatching.api_concurrency) || DEFAULT_API_CONCURRENCY),
@@ -862,14 +931,6 @@ export default function AddPage() {
     setCopiedIdx(null);
     setModalIdx(null);
     setTranslatingPrompts({});
-  }
-
-  function translatedPromptText(prompt) {
-    return promptForEngine(
-      prompt,
-      selectedTtsEngine.id,
-      selectedTtsEngine.budget_policy,
-    );
   }
 
   async function validatePromptResponseText(i, text, prompt, engine = selectedTtsEngine.id) {
@@ -1034,7 +1095,9 @@ export default function AddPage() {
     setError("");
     setTranslatingPrompts((cur) => ({ ...cur, [i]: true }));
     try {
-      const result = await translatePromptTextWithRetry(i, translatedPromptText(activePrompts[i]));
+      // Gửi nguyên văn prompt backend trả về — marker [A-B tiếng] và phần
+      // hướng dẫn đã do backend dựng sẵn (generate_prompts.budget_range_label).
+      const result = await translatePromptTextWithRetry(i, activePrompts[i]);
       const text = result.response || "";
       if (dubbingRef.current) return null;
       setResponses((cur) => ({ ...cur, [i]: text }));
@@ -1115,11 +1178,9 @@ export default function AddPage() {
 
   function copyPrompt(text, i) {
     if (dubbingRef.current) return;
-    navigator.clipboard?.writeText(promptForEngine(
-      text,
-      selectedTtsEngine.id,
-      selectedTtsEngine.budget_policy,
-    ));
+    // Copy nguyên văn: chế độ thủ công và chế độ API phải gửi CÙNG một prompt,
+    // và prompt đó do backend dựng trọn vẹn.
+    navigator.clipboard?.writeText(text);
     setCopiedIdx(i);
     setTimeout(() => setCopiedIdx((cur) => (cur === i ? null : cur)), 1500);
   }
@@ -1153,6 +1214,17 @@ export default function AddPage() {
 
   const apiTranslationMode = translationMode === "api";
   const activePrompts = apiTranslationMode ? (apiPrompts.length ? apiPrompts : prompts) : prompts;
+  const activeBatchMin = apiTranslationMode
+    ? translationBatching.api_min_batch_size
+    : translationBatching.manual_min_batch_size;
+  const activeBatchMax = apiTranslationMode
+    ? translationBatching.api_max_batch_size
+    : translationBatching.manual_max_batch_size;
+  const activeBatchValue = apiTranslationMode ? apiBatchSize : manualBatchSize;
+  const activeBatchValid = batchSizeWithinBounds(activeBatchValue, activeBatchMin, activeBatchMax);
+  const activeBatchRange = activeBatchMin != null && activeBatchMax != null
+    ? ` (${activeBatchMin}–${activeBatchMax})`
+    : "";
   // Cảnh báo độ dài (warnings) KHÔNG chặn dub — chỉ cần cấu trúc hợp lệ (ok).
   const allValid = activePrompts.length > 0 && activePrompts.every((_, i) => (
     validated[i]?.ok
@@ -1285,6 +1357,20 @@ export default function AddPage() {
     }
   }
 
+  async function onCancelLoad() {
+    // Cùng kiểu hủy hợp tác như onCancelDub: gửi yêu cầu rồi để vòng poll thấy
+    // status "cancelled" mà tự dọn UI. Backend dừng ở checkpoint gần nhất —
+    // trong lúc Whisper chạy thì đó là mỗi 2% tiến độ.
+    if (!loadJobId || cancellingLoad) return;
+    setCancellingLoad(true);
+    try {
+      await api.cancelLoad(loadJobId);
+    } catch (e) {
+      // 404 = job vừa kết thúc trước khi bấm; poll sẽ tự xử lý.
+      setCancellingLoad(false);
+    }
+  }
+
   async function onCancelDub() {
     // Hủy HỢP TÁC: gửi yêu cầu rồi để vòng poll thấy status "cancelled" mà tự
     // dọn UI — không reset lạc quan, tôn trọng việc backend thật sự làm (nếu
@@ -1308,7 +1394,6 @@ export default function AddPage() {
     default_model: ttsModels[0] || "M5",
     devices: ["cpu"],
     supports_clone: false,
-    supports_instruction: false,
   };
   const fallbackOmniEngine = {
     id: "omnivoice",
@@ -1318,7 +1403,6 @@ export default function AddPage() {
     default_model: "k2-fsa/OmniVoice",
     devices: ["cuda"],
     supports_clone: true,
-    supports_instruction: true,
     default_voice_id: "academic_male",
     voices: [
       { id: "academic_male", label: "Giọng nam" },
@@ -1364,14 +1448,22 @@ export default function AddPage() {
       ? selectedTtsEngine.voices
       : [];
   const defaultVoiceId = selectedTtsEngine.default_voice_id || currentVoicePresets[0]?.id || "";
-  const supertonicVoiceLabels = {
-    M5: "Giọng nam",
-    F5: "Giọng nữ",
-  };
-  const supertonicVoiceOptions = currentTtsModels.map((model) => ({
-    id: model,
-    label: supertonicVoiceLabels[model] || model,
-  }));
+  // M*/F* là quy ước ID của Supertonic (M1-M5 nam, F1-F5 nữ) -> suy nhãn từ
+  // TIỀN TỐ thay vì liệt kê cứng từng ID. Bảng cũ chỉ khai M5/F5 nên khi
+  // tts.models trong config.yaml đổi sang M3/F3 thì nhãn rơi hết về ID thô.
+  const supertonicGender = (model) => (
+    /^M\d+$/i.test(model) ? "nam" : (/^F\d+$/i.test(model) ? "nữ" : null)
+  );
+  const supertonicVoiceOptions = currentTtsModels.map((model) => {
+    const gender = supertonicGender(model);
+    if (!gender) return { id: model, label: model };
+    // Có từ 2 giọng cùng giới trở lên thì kèm ID để còn phân biệt được.
+    const sameGender = currentTtsModels.filter((m) => supertonicGender(m) === gender);
+    return {
+      id: model,
+      label: sameGender.length > 1 ? `Giọng ${gender} (${model})` : `Giọng ${gender}`,
+    };
+  });
   const currentVoiceOptions = selectedTtsEngine.id === "supertonic"
     ? supertonicVoiceOptions
     : currentVoicePresets;
@@ -1501,8 +1593,7 @@ export default function AddPage() {
       voice_mode: "clone",
       reference_audio_id: "",
       reference_text: "",
-      instruction_tags: [],
-    });
+        });
   }
 
   return (
@@ -1695,6 +1786,29 @@ export default function AddPage() {
                 </div>
               </div>
             </details>
+            {/* Cách tách câu là lựa chọn về NỘI DUNG transcript, không dính gì
+                tới RAM/VRAM -> để ngoài panel "Phần cứng". Phải chọn TRƯỚC khi
+                Load (chỉ tác dụng với video chưa có subtitle cache) nên đặt
+                ngay cạnh nút Load thay vì giấu trong panel gập. */}
+            <div className="load-options">
+              <label className="tts-select">
+                <span>Chế độ tách câu</span>
+                <select
+                  value={sentenceSplitMode}
+                  onChange={(event) => setSentenceSplitMode(event.target.value)}
+                  disabled={loading || dubbing}
+                >
+                  <option value="sync">Ưu tiên khớp hình</option>
+                  <option value="complete">Ưu tiên câu trọn vẹn</option>
+                </select>
+              </label>
+              <em>
+                {sentenceSplitMode === "complete"
+                  ? "Câu không bị cắt ngang, nhưng có thể lệch nhịp hình nếu ngừng nghỉ dài."
+                  : "Khớp hình hơn, nhưng câu có thể bị cắt ngang khi ngừng nghỉ dài."}
+                {" "}Chỉ áp dụng cho video mới load.
+              </em>
+            </div>
           </div>
 
           {loading && (
@@ -1714,6 +1828,16 @@ export default function AddPage() {
                     <span>{Math.max(0, Math.min(100, loadProgress))}%</span>
                   </div>
                 </div>
+              )}
+              {loadJobId && (
+                <button
+                  type="button"
+                  className="cancel-load"
+                  onClick={onCancelLoad}
+                  disabled={cancellingLoad}
+                >
+                  {cancellingLoad ? "Đang hủy…" : "Hủy nạp video"}
+                </button>
               )}
             </div>
           )}
@@ -1805,6 +1929,46 @@ export default function AddPage() {
                         </select>
                       </label>
                     </div>
+                    <div className="translation-batch-controls" aria-label="Số câu mỗi prompt">
+                      {apiTranslationMode ? (
+                        <label className="tts-select">
+                          <span>Số câu/prompt{activeBatchRange}</span>
+                          <input
+                            type="number"
+                            min={activeBatchMin ?? undefined}
+                            max={activeBatchMax ?? undefined}
+                            step={1}
+                            value={apiBatchSize}
+                            onChange={(event) => setApiBatchSize(event.target.value)}
+                            disabled={loading || dubbing}
+                            aria-invalid={!activeBatchValid}
+                          />
+                        </label>
+                      ) : (
+                        <label className="tts-select">
+                          <span>Số câu/prompt{activeBatchRange}</span>
+                          <input
+                            type="number"
+                            min={activeBatchMin ?? undefined}
+                            max={activeBatchMax ?? undefined}
+                            step={1}
+                            value={manualBatchSize}
+                            onChange={(event) => setManualBatchSize(event.target.value)}
+                            disabled={loading || dubbing}
+                            aria-invalid={!activeBatchValid}
+                          />
+                        </label>
+                      )}
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={onLoad}
+                        disabled={loading || dubbing || !url || !activeBatchValid}
+                        title="Đọc lại phụ đề đã lưu (nhanh, không chạy lại Whisper), tạo lại prompt theo số câu mới. Bản dịch đã dán cho video này sẽ mất."
+                      >
+                        Dựng lại prompt
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1818,16 +1982,11 @@ export default function AddPage() {
                         <span>{meta?.chapters?.length || 0} mục</span>
                       </span>
                       <div className="chapter-prompt-actions">
-                        {apiTranslationMode ? (
-                          <button
-                            type="button"
-                            className="chip"
-                            disabled={loading || dubbing || chapterTranslating || !translationProvider || !translationModel}
-                            onClick={translateChaptersByApi}
-                          >
-                            {chapterTranslating ? "Đang dịch" : (chapterResponse.trim() ? "Dịch lại API" : "Dịch API")}
-                          </button>
-                        ) : (
+                        {/* API mode không có nút dịch riêng cho phân cảnh:
+                            "Dịch tất cả bằng API" đã bao gồm nó (xem
+                            translateAllByApi) -> một hành động duy nhất thay vì
+                            bắt người dùng nhớ bấm thêm chỗ này. */}
+                        {!apiTranslationMode && (
                           <button
                             type="button"
                             className={"chip chip-copy" + (chapterCopied ? " chip-ok" : "")}
@@ -1837,9 +1996,8 @@ export default function AddPage() {
                             {chapterCopied ? "Đã copy" : "Copy prompt"}
                           </button>
                         )}
-                        {/* API mode dịch qua nút "Dịch API" bên trái, không cho
-                            dán tay -> chỉ hiện "Sửa nội dung" sau khi đã có
-                            kết quả, giống card prompt thường. */}
+                        {/* API mode không cho dán tay -> chỉ hiện "Sửa nội dung"
+                            sau khi đã có kết quả, giống card prompt thường. */}
                         {(!apiTranslationMode || chapterResponse.trim()) && (
                           <button
                             type="button"
@@ -1853,7 +2011,8 @@ export default function AddPage() {
                       </div>
                     </div>
                     <div className="prompt-end">
-                      {chapterValidation == null && <span className="tag-wait">Chờ</span>}
+                      {chapterTranslating && <span className="tag-wait">Đang dịch</span>}
+                      {!chapterTranslating && chapterValidation == null && <span className="tag-wait">Chờ</span>}
                       {chapterValidation?.ok && <span className="tag-ok">Đã xác nhận</span>}
                       {chapterValidation && !chapterValidation.ok && <span className="tag-fail">Lỗi</span>}
                       {dubbing && chapterValidation?.ok && <span className="tag-ok">Đã khóa</span>}
@@ -1878,20 +2037,15 @@ export default function AddPage() {
                       <span className="prompt-no">{i + 1}</span>
                       <div className="prompt-main">
                         {apiTranslationMode ? (
-                          <>
-                            <button
-                              className="chip"
-                              disabled={loading || dubbing || translatingPrompts[i] || !translationProvider || !translationModel}
-                              onClick={() => translatePromptByApi(i)}
-                            >
-                              {translatingPrompts[i] ? "Đang dịch" : (resp.trim() ? "Dịch lại API" : "Dịch API")}
+                          // Không có nút dịch từng lô: "Dịch tất cả bằng API"
+                          // đã tự bỏ qua lô đã đạt và chỉ chạy lô còn thiếu/lỗi
+                          // (translateAllByApi lọc theo !validated[i]?.ok), nên
+                          // nút riêng ở đây chỉ là một chỗ nữa phải bấm.
+                          resp.trim() && (
+                            <button className="chip chip-pasted" disabled={loading || dubbing} onClick={() => setModalIdx(i)}>
+                              Sửa nội dung
                             </button>
-                            {resp.trim() && (
-                              <button className="chip chip-pasted" disabled={loading || dubbing} onClick={() => setModalIdx(i)}>
-                                Sửa nội dung
-                              </button>
-                            )}
-                          </>
+                          )
                         ) : (
                           <>
                             <button
@@ -1914,7 +2068,10 @@ export default function AddPage() {
                         )}
                       </div>
                       <div className="prompt-end">
-                        {v == null && <span className="tag-wait">Chờ</span>}
+                        {/* Thay cho chữ "Đang dịch" trên nút từng lô đã bỏ —
+                            vẫn phải thấy lô nào đang chạy, không chỉ tổng số. */}
+                        {translatingPrompts[i] && <span className="tag-wait">Đang dịch</span>}
+                        {!translatingPrompts[i] && v == null && <span className="tag-wait">Chờ</span>}
                         {v?.ok && !v.warnings?.length && <span className="tag-ok">{v.segments.length} câu</span>}
                         {v?.ok && v.warnings?.length > 0 && (
                           <span className="tag-warn">{v.warnings.length} cảnh báo</span>
@@ -2081,17 +2238,44 @@ export default function AddPage() {
                       keep_background: event.target.checked,
                     }))}
                   />
-                  <span>Giữ nhạc nền (lâu hơn vài phút)</span>
+                  <span>Giữ nhạc nền</span>
                 </label>
+                <label className="voice-mix">
+                  <span className="voice-mix-label">
+                    Giọng gốc
+                    <em>{clampVoicePercent(ttsConfig.original_voice_percent)}%</em>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={clampVoicePercent(ttsConfig.original_voice_percent)}
+                    disabled={dubbing}
+                    onChange={(event) => setTtsConfig((current) => ({
+                      ...current,
+                      original_voice_percent: clampVoicePercent(event.target.value),
+                    }))}
+                  />
+                  <small>
+                    Giọng người nói trong video gốc, nghe được dưới giọng dub.
+                    0% = bỏ hẳn, 100% = to như bản gốc.
+                  </small>
+                </label>
+                {willSeparateAudio(ttsConfig) && !dubbing && (
+                  <p className="voice-mix-note">
+                    Cần tách audio gốc bằng Demucs — lâu hơn vài phút.
+                  </p>
+                )}
                 {!dubbing && (
                   <button className="primary" disabled={!readyToDub} onClick={onDub}>
                     Bắt đầu dubbing
                   </button>
                 )}
                 {dubbing && (() => {
-                  const keepBg = ttsConfig.keep_background === true;
-                  const steps = keepBg ? DUB_STEPS_WITH_BG : DUB_STEPS;
-                  const stepIdx = dubStepIndex(progress, stage, keepBg);
+                  const separates = willSeparateAudio(ttsConfig);
+                  const steps = separates ? DUB_STEPS_WITH_BG : DUB_STEPS;
+                  const stepIdx = dubStepIndex(progress, stage, separates);
                   const tts = parseTtsProgress(stage);
                   return (
                     <div className="dub-pipeline">

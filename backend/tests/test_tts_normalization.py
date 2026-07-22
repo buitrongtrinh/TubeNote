@@ -12,7 +12,7 @@ from backend.services.dubbing.generate_prompts import build_batches
 from backend.services.dubbing.text_normalizer import (
     apply_pronunciation_map,
     canonicalize_text,
-    normalize_for_engine,
+    normalize_for_tts,
     number_to_vietnamese,
 )
 from backend.services.dubbing.translation_prepare import (
@@ -32,31 +32,30 @@ class TtsNormalizationTests(unittest.TestCase):
         self.assertEqual(canonicalize_text("don't đổi apostrophe trong từ"), "don't đổi apostrophe trong từ")
 
     def test_all_caps_acronyms_are_spelled_letter_by_letter(self):
-        text, rules = normalize_for_engine("ChatGPT và OpenAI dùng LLM.", "omnivoice")
+        text, rules = normalize_for_tts("ChatGPT và OpenAI dùng LLM.")
         self.assertEqual(text, "ChatGPT và OpenAI dùng eo eo em.")
         self.assertEqual(rules, ["acronym"])
 
     def test_glossary_overrides_win_over_acronym_spelling(self):
-        text, rules = normalize_for_engine(
+        text, rules = normalize_for_tts(
             "VRAM và RAM đọc thành từ.",
-            "supertonic",
             glossary={"VRAM": "vi ram", "RAM": "ram"},
         )
         self.assertEqual(text, "vi ram và ram đọc thành từ.")
         self.assertEqual(rules, ["glossary"])
 
     def test_cli_flags_are_spoken(self):
-        text, rules = normalize_for_engine("Chạy --version để kiểm tra.", "supertonic")
+        text, rules = normalize_for_tts("Chạy --version để kiểm tra.")
         self.assertEqual(text, "Chạy trừ trừ version để kiểm tra.")
         self.assertEqual(rules, ["cli_flag"])
 
     def test_single_dash_short_flag_spells_each_letter(self):
-        text, rules = normalize_for_engine("docker ps -a để xem.", "supertonic")
+        text, rules = normalize_for_tts("docker ps -a để xem.")
         self.assertEqual(text, "docker ps trừ ei để xem.")
         self.assertEqual(rules, ["cli_flag"])
 
     def test_single_dash_combined_flags_spell_all_letters(self):
-        text, rules = normalize_for_engine("ls -la liệt kê file.", "supertonic")
+        text, rules = normalize_for_tts("ls -la liệt kê file.")
         self.assertEqual(text, "ls trừ eo ei liệt kê file.")
         self.assertEqual(rules, ["cli_flag"])
 
@@ -64,51 +63,51 @@ class TtsNormalizationTests(unittest.TestCase):
         """Flag đứng ngay trước dấu câu (không có khoảng trắng) vẫn phải được
         đọc — regression: lookahead (?!\\S) cũ làm rule không khớp trường hợp
         này, để nguyên "-d." không đọc."""
-        text, rules = normalize_for_engine("thêm cờ -d.", "supertonic")
+        text, rules = normalize_for_tts("thêm cờ -d.")
         self.assertEqual(text, "thêm cờ trừ đi.")
         self.assertEqual(rules, ["cli_flag"])
 
     def test_indexed_symbol_reads_letter_and_digit(self):
-        text, _ = normalize_for_engine("Ô A1 chứa kết quả.", "supertonic")
+        text, _ = normalize_for_tts("Ô A1 chứa kết quả.")
         self.assertEqual(text, "Ô a một chứa kết quả.")
 
     def test_leading_slash_path_reads_slash_as_siet(self):
-        text, rules = normalize_for_engine("Chép vào /app/src rồi chạy.", "supertonic")
+        text, rules = normalize_for_tts("Chép vào /app/src rồi chạy.")
         self.assertEqual(text, "Chép vào siệt app siệt src rồi chạy.")
         self.assertIn("path", rules)
 
     def test_dotted_name_reads_dot_as_cham(self):
-        text, rules = normalize_for_engine("Mở file abc.cde và example.com.", "supertonic")
+        text, rules = normalize_for_tts("Mở file abc.cde và example.com.")
         self.assertEqual(text, "Mở file abc chấm cde và example chấm com.")
         self.assertIn("path", rules)
 
     def test_path_with_extension_reads_both_separators(self):
-        text, _ = normalize_for_engine("Sửa /app/config.yaml đi.", "supertonic")
+        text, _ = normalize_for_tts("Sửa /app/config.yaml đi.")
         self.assertEqual(text, "Sửa siệt app siệt config chấm yaml đi.")
 
     def test_lone_slash_between_words_is_kept(self):
         # "nam/nữ", "và/hoặc" nghĩa là "hoặc", không phải path → giữ nguyên.
-        text, rules = normalize_for_engine("Chọn nam/nữ tùy ý.", "supertonic")
+        text, rules = normalize_for_tts("Chọn nam/nữ tùy ý.")
         self.assertEqual(text, "Chọn nam/nữ tùy ý.")
         self.assertNotIn("path", rules)
 
     def test_decimal_dot_stays_a_number_not_cham(self):
-        text, rules = normalize_for_engine("Số pi là 3.14 nhé.", "supertonic")
+        text, rules = normalize_for_tts("Số pi là 3.14 nhé.")
         self.assertEqual(text, "Số pi là ba phẩy một bốn nhé.")
         self.assertNotIn("path", rules)
 
     def test_url_scheme_is_left_untouched(self):
-        text, rules = normalize_for_engine("Xem tại https://example.com trang chủ.", "supertonic")
+        text, rules = normalize_for_tts("Xem tại https://example.com trang chủ.")
         self.assertEqual(text, "Xem tại https://example.com trang chủ.")
         self.assertNotIn("path", rules)
 
     def test_tagged_version_reads_name_and_number(self):
-        text, rules = normalize_for_engine("Cài node:22-alpine để build.", "supertonic")
+        text, rules = normalize_for_tts("Cài node:22-alpine để build.")
         self.assertEqual(text, "Cài node hai mươi hai alpine để build.")
         self.assertIn("tagged_version", rules)
 
     def test_physical_units_are_spoken(self):
-        text, _ = normalize_for_engine("Nặng 5 kg và chạy 10 km.", "supertonic")
+        text, _ = normalize_for_tts("Nặng 5 kg và chạy 10 km.")
         self.assertEqual(text, "Nặng năm ki lô gam và chạy mười ki lô mét.")
 
     def test_pronunciation_map_overrides_whole_terms_case_insensitively(self):
@@ -120,9 +119,8 @@ class TtsNormalizationTests(unittest.TestCase):
         self.assertEqual(mapping, {"RAG": "Rác"})
 
     def test_omnivoice_normalizes_contextual_numbers(self):
-        text, rules = normalize_for_engine(
+        text, rules = normalize_for_tts(
             "GPT-4 chạy trên RTX 4090 với 16 GB VRAM.",
-            "omnivoice",
         )
         self.assertEqual(
             text,
@@ -134,14 +132,14 @@ class TtsNormalizationTests(unittest.TestCase):
         self.assertIn("acronym", rules)
 
     def test_math_is_spoken_in_vietnamese(self):
-        text, _ = normalize_for_engine("f(x) = W1 * x + 3.14?", "omnivoice")
+        text, _ = normalize_for_tts("f(x) = W1 * x + 3.14?")
         self.assertEqual(
             text,
             "ép của ích bằng đúp liu một nhân ích cộng ba phẩy một bốn?",
         )
 
     def test_mixed_case_terms_stay_verbatim(self):
-        text, _ = normalize_for_engine("ChatGPT, OpenAI, C++ và LLM.", "supertonic")
+        text, _ = normalize_for_tts("ChatGPT, OpenAI, C++ và LLM.")
         self.assertEqual(
             text,
             "ChatGPT, OpenAI, C++ và eo eo em.",
@@ -300,9 +298,11 @@ class TtsNormalizationTests(unittest.TestCase):
             path = Path(tmp) / "segments.json"
             path.write_text(json.dumps(segments), encoding="utf-8")
             batch = build_batches(str(path), batch_size=10)[0]
-        # duration 4.0 → budget gốc 24; "16 GB" surcharge 3 → còn 21.
-        self.assertIn("1. [≤21 tiếng] It needs 16 GB", batch)
-        self.assertIn("2. [≤24 tiếng] Plain sentence here", batch)
+        # duration 4.0 → budget gốc 24; "16 GB" surcharge 3 → còn 21. Marker
+        # phát ra là khoảng [A-B tiếng] (budget_range_label) chứ không phải số
+        # đơn — surcharge thể hiện qua việc dòng 1 hẹp hơn dòng 2.
+        self.assertIn("1. [11-26 tiếng] It needs 16 GB", batch)
+        self.assertIn("2. [12-28 tiếng] Plain sentence here", batch)
 
     def test_fit_to_slot_preserves_slot_length_and_warns_when_compressed(self):
         import numpy as np

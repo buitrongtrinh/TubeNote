@@ -72,7 +72,6 @@ def natural_duration_seconds(text: str, policy: TtsDensityPolicy | None = None) 
 
 def estimate_expansion_units(
     text: str,
-    engine: str = "supertonic",
     glossary: dict | None = None,
 ) -> int:
     """Số tiếng PHÁT SINH khi TTS đọc các token giữ-nguyên-dạng-viết.
@@ -81,11 +80,11 @@ def estimate_expansion_units(
     số/đơn vị/acronym được giữ verbatim qua bước dịch) rồi lấy chênh lệch số
     tiếng. Dùng để trừ trước vào budget ở bước tạo prompt.
     """
-    from backend.services.dubbing.text_normalizer import normalize_for_engine
+    from backend.services.dubbing.text_normalizer import normalize_for_tts
 
     if not text:
         return 0
-    expanded, _ = normalize_for_engine(text, engine, glossary=glossary)
+    expanded, _ = normalize_for_tts(text, glossary=glossary)
     return max(0, count_spoken_units(expanded) - count_spoken_units(text))
 
 

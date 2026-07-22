@@ -126,9 +126,35 @@ whisper:
   # theo pause thật nên có thể dính 2 câu làm 1 hoặc lệch mốc đầu/cuối.
   # Preset nào tắt word_timestamps sẽ tự rơi về hành vi cũ (dùng nguyên
   # segment.text/start/end). Xem transcript_whisper.py::_split_into_entries.
-  sentence_pause_alpha: 0.02   # giây; gap giữa 2 từ >= ngưỡng này -> cắt câu mới
+  # TRIẾT LÝ NGƯỠNG PAUSE: đây là "máy dò im lặng dài" (ranh giới thật —
+  # chuyển cảnh, ngắt đoạn), KHÔNG phải "máy dò nghỉ hơi". Người nói ngập
+  # ngừng suy nghĩ NGAY GIỮA câu tới ~1s (đo thật IVmk5D61_3k) — cắt tại đó
+  # tạo 2 mảnh câu cụt: dịch mất ngữ cảnh, TTS đọc ngữ điệu kết câu ở chỗ
+  # chưa hết ý, nghe cắt quãng khó chịu. Dấu kết câu (.!?) mới là tín hiệu
+  # cắt chính; pause chỉ đỡ khi chữ THIẾU dấu chấm (vd manual sub cẩu thả)
+  # đứng trước im lặng dài thật (video trên có khoảng lặng 16.7s chuyển
+  # cảnh — không có ngưỡng này thì slot câu phủ luôn 16.7s im lặng).
+  # Đánh đổi có chủ đích: khoảng nghĩ giữa câu bị nuốt vào slot (dub đọc
+  # liền mạch, im lặng dồn về cuối slot) — chấp nhận để đổi câu trọn vẹn.
+  sentence_pause_alpha: 1.5    # giây; gap giữa 2 từ >= ngưỡng này -> cắt câu mới
   sentence_max_words: 20        # NGƯỠNG kích hoạt cắt mềm: câu dài hơn sẽ được cắt tại dấu phẩy/liên từ nếu có; KHÔNG cắt cứng theo đếm từ (không có điểm cắt tự nhiên -> giữ nguyên câu dài). Đặt 0 để tắt hẳn tầng này.
-  sentence_min_words: 2        # câu tách ra ít hơn ngần này từ (vd 1 từ đứng riêng) sẽ tự gộp vào câu liền kề gần hơn về thời gian
+  # 4 (trước: 2): lớp bảo vệ thứ 2 độc lập với pause_alpha — chặn thẳng
+  # triệu chứng (câu 2-3 từ đứng lẻ) bất kể lần Whisper chạy sạch hay nhiễu.
+  sentence_min_words: 4        # câu tách ra ít hơn ngần này từ sẽ tự gộp vào câu liền kề gần hơn về thời gian
+  # Ngưỡng pause cho MANUAL SUB (cue caption -> pseudo-words -> cùng bộ máy
+  # _split_into_entries). Nới hơn Whisper vì gap giữa cue lẫn cả nhịp hiển
+  # thị caption, không chỉ nhịp nói.
+  caption_sentence_pause_alpha: 2.0
+  # Mode "Ưu tiên câu trọn vẹn" (người dùng chọn ở UI, thay cho cặp số phía
+  # trên): tắt HẲN cắt-theo-pause, chỉ còn cắt ở dấu kết câu — mỗi đoạn luôn
+  # là 1 câu trọn vẹn dù khoảng lặng giữa chừng dài bao lâu. Đặt 4.0s (thay
+  # vì literal "vô hạn") để vẫn có 1 trần chặn tình huống cực đoan (nhạc nền
+  # dài không lời, không dấu câu) — không gộp vô hạn không kiểm soát. Dùng
+  # chung 1 số cho cả Whisper lẫn caption: ở mức cao này mục đích là "gần như
+  # không bao giờ kích hoạt", nên chênh lệch noise giữa 2 nguồn (lý do cặp
+  # 1.5/2.0 ở trên khác nhau) không còn ý nghĩa.
+  sentence_pause_alpha_complete: 4.0
+  caption_sentence_pause_alpha_complete: 4.0
   # cpu_threads: 0 = auto theo số core máy (clamp hardware.max_auto_threads).
   #
   # batch_size / progressive: đã ĐO THẬT bằng scripts/measure_vram.py
@@ -253,11 +279,14 @@ whisper:
 translation:
   # Model dịch transcript → tiếng Việt segment-by-segment (giữ timestamps)
   model: gemini-2.5-flash-lite
-  # Batch thủ công: copy prompt sang ChatGPT. 50 vẫn ổn vì người dùng tự kiểm tra.
-  manual_batch_size: 100
+  # Batch thủ công: copy prompt sang ChatGPT; có thể để lớn vì người dùng tự kiểm tra.
+  manual_batch_size: 90
+  manual_min_batch_size: 50
+  manual_max_batch_size: 150
   # Batch API: nhỏ hơn để giảm lỗi thiếu/thừa dòng khi model trả về.
-  api_batch_size: 25
-  api_min_batch_size: 5
+  api_batch_size: 50
+  api_min_batch_size: 50
+  api_max_batch_size: 150
   api_max_chars_per_batch: 4000
   api_concurrency: 8
   api_job_timeout_sec: 300
@@ -265,10 +294,10 @@ translation:
 tts:
   # Supertonic voice/model name. Có thể override default bằng env TTS_MODEL.
   # Thêm voice hợp lệ vào đây để frontend hiện trong dropdown.
-  default_model: M3
+  default_model: M4
   models:
-    - M3
-    - F3
+    - M4
+    - F4
 
   # Tham số tuning riêng cho engine Supertonic (CPU). Trước đây nằm hardcode
   # trong backend/pipeline/dubbing.py::TTS_POLICIES — gom về đây để có 1 nơi
@@ -281,11 +310,11 @@ tts:
     # Hệ số an toàn khi tính speed thích ứng theo từng câu
     # (engines/supertonic.py::adaptive_speed). >1 nghĩa là chỉ yêu cầu nói
     # nhanh gần đủ mức cần, phần dư nhường cho WSOLA/atempo.
-    speed_alpha: 1.2
+    speed_alpha: 4.0
     # Gộp segment liền kề nếu tổng ký tự <= giá trị này (0 = không gộp).
     merge_max_chars: 20
     # Tốc độ phát lại cuối cùng của video xuất ra (retime, không phải TTS speed).
-    output_speed: 1.0
+    output_speed: 1.15
     # Số thread ONNX Runtime cho Supertonic (intra_op). 0 = auto (ORT tự chọn
     # theo core máy). Model cache global -> đổi giá trị cần restart backend.
     intra_op_threads: 0
@@ -358,15 +387,30 @@ audio_fit:
 
 # Trộn audio dub + nền gốc/background khi mux video cuối cùng
 # (backend/services/dubbing/common.py::merge_video_audio).
+# Trộn 3 nguồn: GIỌNG DUB (TTS sinh ra) + GIỌNG GỐC (stem vocals của Demucs)
+# + NHẠC NỀN (stem no_vocals). Giọng gốc và nhạc nền chỉ tồn tại khi đã tách;
+# hai lựa chọn của người dùng (giữ nhạc nền / mức giọng gốc) độc lập nhau.
 mix:
-  # Âm lượng track gốc khi KHÔNG tách nền bằng Demucs (giữ nguyên cả giọng gốc, rất nhỏ).
+  # Chỉ còn là fallback của merge_video_audio khi gọi mà không truyền bed_volume.
+  # Luồng dubbing hiện tại luôn truyền tường minh nên không dùng tới.
   original_volume: 0.05
-  # Âm lượng track dub khi KHÔNG tách nền.
+  # Gain giọng dub khi mix KHÔNG có nền nào (bỏ cả nhạc nền lẫn giọng gốc).
+  # Lúc đó giọng dub là nội dung duy nhất nên loudnorm cuối quyết định là chính.
   dub_volume_no_background: 1.6
-  # Âm lượng track nền đã tách bằng Demucs (sạch giọng, để nguyên volume gốc).
+  # Gain nhạc nền khi được giữ. 1.0 = nguyên mức tự nhiên, để giữ đúng quan hệ
+  # nhạc/giọng mà tác giả video đã cân sẵn.
   background_volume: 1.0
-  # Âm lượng track dub khi CÓ tách nền bằng Demucs.
-  dub_volume_with_background: 1.35
+  # Trim giọng dub khi CÓ tách audio gốc. Lúc này giọng dub đã được chuẩn hoá
+  # về ĐÚNG độ to của giọng gốc đo từ stem vocals, nên đây chỉ là nút vặn tinh
+  # chỉnh trên nền đó (1.0 = đúng bằng giọng gốc), không phải gain đứng một mình.
+  dub_volume_with_background: 1.0
+  # Mức giọng gốc nghe được dưới giọng dub, thang 0-100 người dùng kéo ở UI.
+  # 0 = bỏ hẳn giọng gốc, 100 = to như trong bản gốc. Đây chỉ là giá trị mặc
+  # định khi payload không gửi. LƯU Ý: > 0 thì Demucs phải chạy (thêm vài phút)
+  # kể cả khi đã bỏ nhạc nền, vì phải tách mới lấy được giọng gốc ra.
+  original_voice_percent: 40
+  # Số mũ đường cong percent -> gain (xem MixCfg.original_voice_curve).
+  original_voice_curve: 2.0
   # loudnorm (EBU R128) áp lên track đã mix, thay cho peak-clip chỉ hạ không nâng.
   loudnorm_i: -16      # target loudness (LUFS)
   loudnorm_tp: -1.5    # true peak tối đa (dBTP)

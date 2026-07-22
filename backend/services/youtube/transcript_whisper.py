@@ -253,6 +253,11 @@ def _merge_short_ranges(
     """Gộp các dải quá ngắn (< min_words từ, vd 1 từ đứng riêng) vào dải liền
     kề GẦN HƠN về thời gian (gap nhỏ hơn), thay vì để đứng tách 1 mình — dịch
     và lồng tiếng 1 câu chỉ 1-2 từ nghe cụt lủn, thiếu ngữ cảnh.
+
+    NGOẠI LỆ: dải đã kết thúc bằng dấu kết câu (.!?…) không bị gộp dù ngắn —
+    đó là câu hoàn chỉnh thật (vd "Hello there.", "Yes.", "Okay?"), không phải
+    mảnh vụn do cắt theo pause; gộp nó với câu sau sẽ ghép 2 câu độc lập thành
+    1, dịch/lồng tiếng sai nghĩa.
     """
     if len(ranges) <= 1 or min_words <= 1:
         return ranges
@@ -262,7 +267,7 @@ def _merge_short_ranges(
     while changed:
         changed = False
         for idx, (i, j) in enumerate(merged):
-            if j - i >= min_words:
+            if j - i >= min_words or _is_sentence_end(words[j - 1]):
                 continue
             has_prev = idx > 0
             has_next = idx < len(merged) - 1
@@ -427,6 +432,7 @@ def _transcribe_faster(
     cfg: dict,
     language: str,
     on_progress: ProgressCallback | None = None,
+    sentence_pause_alpha: float | None = None,
 ) -> Optional[Transcript]:
     if on_progress:
         on_progress("Đang tải model Whisper…")
@@ -461,6 +467,7 @@ def _transcribe_faster(
         segments,
         getattr(_info, "duration", None),
         on_progress,
+        sentence_pause_alpha=sentence_pause_alpha,
     )
 
 
@@ -472,6 +479,7 @@ def fetch_transcript(
     language: Optional[str] = None,
     preset: Optional[str] = None,
     on_progress: ProgressCallback | None = None,
+    sentence_pause_alpha: float | None = None,
 ) -> Optional[str]:
     """Download audio (skip nếu có) → Whisper transcribe → save json.
 
@@ -507,7 +515,10 @@ def fetch_transcript(
             if cfg["engine"] == "openai":
                 trans = _transcribe_openai(audio_path, language, on_progress)
             else:
-                trans = _transcribe_faster(audio_path, cfg, language, on_progress)
+                trans = _transcribe_faster(
+                    audio_path, cfg, language, on_progress,
+                    sentence_pause_alpha=sentence_pause_alpha,
+                )
         finally:
             _release_models()
     if trans is None:

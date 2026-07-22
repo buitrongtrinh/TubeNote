@@ -94,7 +94,11 @@ function buildDubbingRows(meta, segments) {
     ["Giọng", tts.voice_label || tts.voice_id],
     ["Chất lượng", tts.num_step || fallbackSegment?.num_step ? `${tts.num_step || fallbackSegment?.num_step} steps` : null],
     ["Batch TTS", tts.batch_size ? String(tts.batch_size) : null],
-    ["ASR", compactJoin([asr.preset, asr.engine])],
+    // Video có phụ đề người đăng tự làm -> Whisper không chạy, hiện đúng
+    // nguồn thay vì model ASR đã chọn (nhưng không dùng).
+    asr.source === "manual_sub"
+      ? ["Phụ đề nguồn", "Phụ đề gốc của video (manual sub)"]
+      : ["ASR", compactJoin([asr.preset, asr.engine])],
     ["Dịch", translationLabel],
     ["Nhạc nền", typeof background.enabled === "boolean" ? (background.enabled ? `Bật${background.source ? ` · ${background.source}` : ""}` : "Tắt") : null],
     ["Timing", timingLabel],

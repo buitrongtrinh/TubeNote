@@ -66,14 +66,25 @@ class WhisperCfg:
     sentence_pause_alpha: float
     sentence_max_words: int
     sentence_min_words: int
+    # Ngưỡng pause RIÊNG cho đường manual sub (cue -> pseudo-words qua cùng
+    # bộ máy): gap giữa cue lẫn cả nhịp hiển thị + ngập ngừng giữa câu nên
+    # phải nới lỏng hơn hẳn gap giữa từ của Whisper.
+    caption_sentence_pause_alpha: float
+    # Mode "Ưu tiên câu trọn vẹn" (chọn ở UI) — override 2 ngưỡng trên, tắt
+    # gần như hẳn cắt-theo-pause. Xem comment trong config.yaml.
+    sentence_pause_alpha_complete: float
+    caption_sentence_pause_alpha_complete: float
 
 
 @dataclass
 class TranslationCfg:
     model: str              # LLM dịch transcript → VN
     manual_batch_size: int
+    manual_min_batch_size: int
+    manual_max_batch_size: int
     api_batch_size: int
     api_min_batch_size: int
+    api_max_batch_size: int
     api_max_chars_per_batch: int
     api_concurrency: int
     api_job_timeout_sec: int
@@ -140,6 +151,13 @@ class MixCfg:
     loudnorm_i: float
     loudnorm_tp: float
     loudnorm_lra: float
+    # Mặc định thanh "giọng gốc" (0-100) khi tách nền — UI gửi giá trị người
+    # dùng chọn, đây chỉ là fallback khi payload không có.
+    original_voice_percent: float
+    # Số mũ đường cong percent -> gain. 2.0 = perceptual: 50 -> 0.25 (-12dB),
+    # tức đúng "một nửa độ to" theo cảm nhận, thay vì 0.5 (-6dB) chỉ nghe như
+    # ~70%. Hạ về 1.0 nếu muốn thanh trượt tuyến tính theo biên độ.
+    original_voice_curve: float
 
 
 @dataclass
@@ -273,14 +291,20 @@ def load() -> AppCfg:
         sentence_pause_alpha=float(ws_raw_whisper.get("sentence_pause_alpha", 0.02)),
         sentence_max_words=int(ws_raw_whisper.get("sentence_max_words", 16)),
         sentence_min_words=int(ws_raw_whisper.get("sentence_min_words", 2)),
+        caption_sentence_pause_alpha=float(ws_raw_whisper.get("caption_sentence_pause_alpha", 1.0)),
+        sentence_pause_alpha_complete=float(ws_raw_whisper.get("sentence_pause_alpha_complete", 4.0)),
+        caption_sentence_pause_alpha_complete=float(ws_raw_whisper.get("caption_sentence_pause_alpha_complete", 4.0)),
     )
 
     tr_raw = raw.get("translation", {})
     translation = TranslationCfg(
         model=str(tr_raw.get("model", "gemini-2.5-flash-lite")),
         manual_batch_size=int(tr_raw.get("manual_batch_size", 50)),
+        manual_min_batch_size=int(tr_raw.get("manual_min_batch_size", 5)),
+        manual_max_batch_size=int(tr_raw.get("manual_max_batch_size", 300)),
         api_batch_size=int(tr_raw.get("api_batch_size", 25)),
         api_min_batch_size=int(tr_raw.get("api_min_batch_size", 5)),
+        api_max_batch_size=int(tr_raw.get("api_max_batch_size", 300)),
         api_max_chars_per_batch=int(tr_raw.get("api_max_chars_per_batch", 4000)),
         api_concurrency=int(tr_raw.get("api_concurrency", 8)),
         api_job_timeout_sec=int(tr_raw.get("api_job_timeout_sec", 300)),
@@ -365,6 +389,8 @@ def load() -> AppCfg:
         loudnorm_i=float(mix_raw.get("loudnorm_i", -16)),
         loudnorm_tp=float(mix_raw.get("loudnorm_tp", -1.5)),
         loudnorm_lra=float(mix_raw.get("loudnorm_lra", 11)),
+        original_voice_percent=float(mix_raw.get("original_voice_percent", 50)),
+        original_voice_curve=float(mix_raw.get("original_voice_curve", 2.0)),
     )
 
     hw_raw = raw.get("hardware", {}) or {}

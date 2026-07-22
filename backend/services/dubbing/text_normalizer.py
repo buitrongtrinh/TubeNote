@@ -334,9 +334,8 @@ def _spell_acronyms(text: str, applied: set[str]) -> str:
     return re.sub(r"(?<![\w-])[A-Z]{2,}(?![\w-])", spell, text)
 
 
-def normalize_for_engine(
+def normalize_for_tts(
     text: str,
-    engine: str = "supertonic",  # giữ để tương thích chữ ký; cascade nay chung cho mọi engine
     glossary: dict | None = None,
 ) -> tuple[str, list[str]]:
     """Hàm public: biến text hiển thị (text_vi) thành text để TTS đọc (text_tts).

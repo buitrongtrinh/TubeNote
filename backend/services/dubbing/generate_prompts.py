@@ -1,6 +1,8 @@
 import json
+import math
 import re
 
+from backend.config import CFG
 from backend.services.dubbing.duration_budget import estimate_expansion_units
 from backend.services.dubbing.glossary import load_glossary
 
@@ -21,6 +23,25 @@ def syllable_budget(duration: float) -> int:
     return max(2, round(duration * SYLLABLES_PER_SEC))
 
 
+def budget_range_label(budget: int) -> str:
+    """Đổi ngân sách 1 số thành marker khoảng ``[A-B tiếng]`` cho prompt.
+
+    Trước đây phép đổi này nằm ở frontend (``promptForEngine``/
+    ``omniBudgetLabel`` trong add/page.jsx): backend phát ``[≤N tiếng]`` rồi
+    frontend viết đè thành ``[A-B tiếng]`` trước khi gửi/copy. Chuyển hẳn về
+    đây để prompt chỉ có MỘT nơi dựng — frontend giờ gửi nguyên văn.
+
+    Giữ đúng thứ tự phép tính cũ (kể cả việc suy ngược ``duration`` từ
+    ``budget``) để prompt LLM nhận được không đổi một byte nào.
+    """
+    policy = CFG.tts.omnivoice_budget
+    duration = max(0.1, budget / policy.source_units_per_sec)
+    min_units = max(1, math.floor(duration * policy.min_units_per_sec))
+    base_max = max(2, math.floor(duration * policy.max_units_per_sec))
+    tolerance = max(policy.tolerance_min, math.ceil(base_max * policy.tolerance_ratio))
+    return f"[{min_units}-{base_max + tolerance} tiếng]"
+
+
 def build_batches(file_path: str, batch_size: int = 150, max_chars_per_batch: int = 0) -> list[str]:
     segments = load_json(file_path)
     result = []
@@ -38,7 +59,7 @@ def build_batches(file_path: str, batch_size: int = 150, max_chars_per_batch: in
             # gi ga bai"): LLM đếm GB là 1 tiếng, TTS đọc thành nhiều tiếng.
             surcharge = estimate_expansion_units(seg.get('text') or '', glossary=glossary)
             budget = max(2, syllable_budget(seg.get('duration', 0) or 0) - surcharge)
-            line = f"{len(lines) + 1}. [≤{budget} tiếng] {seg['text']}"
+            line = f"{len(lines) + 1}. {budget_range_label(budget)} {seg['text']}"
             if lines and max_chars and total_chars + len(line) + 1 > max_chars:
                 break
             lines.append(line)
@@ -72,14 +93,15 @@ QUY TẮC THEO THỨ TỰ ƯU TIÊN
 - Mỗi dòng input tạo đúng một dòng output: "<số>. <bản dịch>".
 - Giữ nguyên số thứ tự và thứ tự dòng; không gộp, tách, bỏ hoặc thêm dòng.
 - Không thêm mở đầu, giải thích, ghi chú, Markdown hay code block.
-- Không chép ký hiệu "[≤N tiếng]" vào bản dịch.
+- Không chép marker "[A-B tiếng]" vào bản dịch.
 
-2. VỪA THỜI LƯỢNG
-- "[≤N tiếng]" là số tiếng Việt tối đa của dòng đó.
-- Bản dịch phải không vượt N tiếng. Ưu tiên câu ngắn, bỏ từ đệm và ý phụ; không
-  được làm mất ý chính.
-- Ngân sách N đã trừ sẵn chi phí đọc số, đơn vị và chữ viết tắt (hệ thống TTS
-  sẽ đọc đầy đủ); cứ đếm mỗi số/viết tắt là một tiếng, không tự phiên âm bù.
+2. VỪA THỜI LƯỢNG CHO TTS
+- "[A-B tiếng]" là khoảng độ dài nên dùng cho dòng đó; B là giới hạn tối đa bắt buộc.
+- Một "tiếng" là một cụm được tách bằng khoảng trắng trong bản dịch tiếng Việt.
+- Sau khi dịch mỗi dòng, tự đếm số tiếng. Nếu vượt B, phải tự rút gọn dòng đó trước khi trả lời.
+- Cố gắng nằm trong khoảng A-B nếu vẫn đủ ý; với câu rất ngắn, được thấp hơn A nếu tự nhiên hơn.
+- Với slot rất ngắn, dùng cụm cực ngắn, có thể giữ thuật ngữ tiếng Anh nếu ngắn hơn bản Việt.
+- Nếu câu nguồn dài, bỏ từ đệm và ý phụ; không diễn giải thêm, không thêm ví dụ, không thêm chủ ngữ nếu không cần.
 
 3. DỊCH TỰ NHIÊN VÀ NHẤT QUÁN
 - Đọc các dòng liên tiếp như một đoạn để giữ mạch nghĩa, giọng điệu và cách xưng hô.
@@ -95,7 +117,7 @@ QUY TẮC THEO THỨ TỰ ƯU TIÊN
 - Viết đầy đủ viết tắt tiếng Việt, ví dụ TP.HCM → thành phố Hồ Chí Minh.
 
 Trước khi trả lời, tự kiểm tra thầm rằng đủ mọi số thứ tự, không có dòng thừa và
-mỗi câu không vượt ngân sách. Chỉ xuất kết quả theo mẫu:
+mỗi câu không vượt giới hạn B trong marker [A-B tiếng]. Chỉ xuất kết quả theo mẫu:
 
 {batch_header}
 1. Bản dịch câu thứ nhất.

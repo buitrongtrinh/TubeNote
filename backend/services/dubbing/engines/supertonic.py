@@ -10,10 +10,17 @@ from backend.services.dubbing.audio_fit import active_range_samples, fit_to_slot
 if TYPE_CHECKING:
     from supertonic import TTS
 
-# Giới hạn kỹ thuật của Supertonic (API chỉ nhận speed trong khoảng này) —
-# ràng buộc phần cứng/thư viện, khác với các tham số tuning (nằm ở config.yaml).
-TTS_SPEED_MIN = 0.7
-TTS_SPEED_MAX = 2.0
+# Dải speed KHUYẾN NGHỊ của nhà phát triển Supertonic (py/README.md: "Recommended
+# speed range is between 0.9 and 1.5 for natural-sounding results"). API vẫn nhận
+# 0.7-2.0, nhưng ngoài dải này mô hình dễ mất ổn định khi đọc — maintainer xác
+# nhận lỗi nuốt/lặp từ phụ thuộc tổ hợp "text / voice / seed / speed", và người
+# dùng báo nuốt từ ở speed chậm 0.7-0.8.
+#
+# Ép sát trần không mất gì: phần nén còn lại đã có WSOLA/atempo trong
+# fit_to_slot gánh, đúng như ý đồ ghi trong adaptive_speed ("nhường cho
+# WSOLA/atempo... tránh ép TTS sát nút ngay từ lúc tổng hợp").
+TTS_SPEED_MIN = 0.9
+TTS_SPEED_MAX = 1.5
 
 
 def _speech_slot(data: list, idx: int, sample_rate: int) -> int:
@@ -46,8 +53,6 @@ def text_to_speech(
     tts: "TTS",
     style: str,
     speed_alpha: float = CFG.tts.supertonic.speed_alpha,
-    max_speed: float = TTS_SPEED_MAX,
-    priority: str = "sync",
     total_steps: int = CFG.tts.supertonic.num_step,
     wsola_limit: float = CFG.tts.supertonic.wsola_limit,
     on_progress=None,

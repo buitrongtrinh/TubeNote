@@ -128,8 +128,6 @@ def save_tts_timings_to_file(timings: list[dict], file_path: str, tts_config: di
         "voice_id": cfg.get("voice_id"),
         "device": cfg.get("device", "cpu"),
         "speed": cfg.get("speed", 1.0),
-        "instruction": cfg.get("instruction"),
-        "instruction_tags": cfg.get("instruction_tags"),
         "postprocess_output": cfg.get("postprocess_output"),
         "num_step": cfg.get("num_step"),
     }
@@ -245,37 +243,173 @@ def save_playback_timings_to_file(file_path: str, speed: float):
     _atomic_write_json(data, file_path)
 
 
+# Dưới mức này, stem "giọng" của Demucs coi như không chứa tiếng nói thật (chỉ
+# còn nhiễu tách) nên không dùng làm mốc canh độ to cho dub. Loudnorm đo theo
+# EBU R128 có gating bỏ qua khoảng lặng, nên giọng nói thật — kể cả thu nhỏ —
+# vẫn đo cao hơn ngưỡng này khá xa.
+_VOICE_ANCHOR_MIN_LUFS = -45.0
+
+
+def _measure_loudness(path: str, target_i: float, target_tp: float, target_lra: float) -> dict | None:
+    """Pass 1 của two-pass loudnorm: đo loudness thực tế của 1 file audio đứng
+    riêng (ghi ra /dev/null, không tạo file), trả về input_i/tp/lra/thresh để
+    pass 2 dùng ở chế độ linear. Trả None nếu đo lỗi (file quá ngắn/silence...)
+    để nơi gọi tự rơi về hành vi cũ (không pre-normalize track đó)."""
+    import ffmpeg
+
+    try:
+        _, stderr = (
+            ffmpeg
+            .input(path)
+            .filter('loudnorm', i=target_i, tp=target_tp, lra=target_lra, print_format='json')
+            .output('-', format='null')
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+    except ffmpeg.Error:
+        return None
+
+    text = stderr.decode('utf-8', errors='ignore')
+    start, end = text.rfind('{'), text.rfind('}')
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        return json.loads(text[start:end + 1])
+    except ValueError:
+        return None
+
+
+def _prenormalize_loudness(stream, measured: dict | None, target_i: float, target_tp: float, target_lra: float):
+    """Pass 2: đưa 1 track về đúng target_i đo thực tế (linear=true), thay vì
+    chế độ dynamic một-pass mặc định. Dùng để dub và bed cùng khởi điểm từ 1
+    mức loudness chung trước khi áp gain tỉ lệ cố định (dub_volume/
+    original_volume) — nếu không, 2 gain đó phải gánh luôn cả phần chênh lệch
+    loudness tự nhiên giữa các nguồn (TTS thường có level khác hẳn track gốc
+    hay nhạc nền tuỳ video), nên cùng 1 bộ gain cho mọi video sẽ không ổn định."""
+    import ffmpeg
+
+    if not measured:
+        return stream
+    try:
+        return ffmpeg.filter(
+            stream, 'loudnorm',
+            i=target_i, tp=target_tp, lra=target_lra,
+            measured_i=measured['input_i'], measured_tp=measured['input_tp'],
+            measured_lra=measured['input_lra'], measured_thresh=measured['input_thresh'],
+            linear='true',
+        )
+    except KeyError:
+        return stream
+
+
+def voice_percent_to_gain(percent: float | None, curve: float | None = None) -> float:
+    """Thanh 0-100 của UI -> hệ số nhân biên độ cho giọng gốc.
+
+    Dùng đường cong mũ (mặc định bình phương) thay vì chia thẳng cho 100: tai
+    người nghe -6dB (gain 0.5) ra khoảng 70% chứ không phải một nửa, phải giảm
+    ~10dB mới thấy "còn một nửa". Với curve=2, 50 -> 0.25 (-12dB) nên con số
+    người dùng nhập khớp với cái họ thực sự nghe được.
+    """
+    mix_cfg = CFG.mix
+    curve = mix_cfg.original_voice_curve if curve is None else curve
+    percent = mix_cfg.original_voice_percent if percent is None else percent
+    ratio = min(max(float(percent), 0.0), 100.0) / 100.0
+    return round(ratio ** float(curve), 6)
+
+
 def merge_video_audio(
     video_path: str,
     audio_dub: str,
-    audio_original: str,
     output_path: str,
-    original_volume: float | None = None,
+    audio_bed: str | None = None,
+    bed_volume: float | None = None,
     dub_volume: float | None = None,
     playback_speed: float = 1.0,
+    audio_voice: str | None = None,
+    voice_volume: float = 0.0,
 ):
+    """Mux video với audio đã trộn từ tối đa 3 nguồn.
+
+    - ``audio_dub``    — giọng dub (TTS sinh ra). Luôn có.
+    - ``audio_voice``  — giọng gốc (stem ``vocals`` của Demucs). Có khi đã tách.
+      Dùng làm MỐC chuẩn hoá độ to cho giọng dub, và được trộn thêm vào mix khi
+      ``voice_volume`` > 0.
+    - ``audio_bed``    — nhạc nền (stem ``no_vocals``), hoặc audio gốc nguyên
+      khối khi không tách. ``None`` = không trộn nền vào.
+
+    Cả ba đều tuỳ chọn trừ giọng dub, nên hàm phục vụ được mọi tổ hợp mà UI cho
+    chọn, kể cả "chỉ giọng dub" (không nhạc nền, không giọng gốc).
+    """
     import ffmpeg
 
     mix_cfg = CFG.mix
-    original_volume = mix_cfg.original_volume if original_volume is None else original_volume
+    bed_volume = mix_cfg.original_volume if bed_volume is None else bed_volume
     dub_volume = mix_cfg.dub_volume_no_background if dub_volume is None else dub_volume
 
     video = ffmpeg.input(video_path)
     dub = ffmpeg.input(audio_dub)
-    original = ffmpeg.input(audio_original)
 
-    original_attenuated = ffmpeg.filter(original, 'volume', original_volume)
-    dub_attenuated = ffmpeg.filter(dub, 'volume', dub_volume)
-    # amix mặc định normalize=1 → tự chia đôi biên độ tổng khi trộn 2 input,
-    # làm bản dub nhỏ hơn dự kiến một cách hệ thống dù đã tăng dub_volume.
-    # Tắt normalize, giữ cân bằng dub:nền qua volume ở trên, rồi chuẩn hoá độ
-    # to cảm nhận ở bước loudnorm bên dưới thay vì dựa vào amix.
-    mixed_audio = ffmpeg.filter(
-        [dub_attenuated, original_attenuated], 'amix', inputs=2, duration='first', normalize=0,
+    voice_measured = (
+        _measure_loudness(audio_voice, mix_cfg.loudnorm_i, mix_cfg.loudnorm_tp, mix_cfg.loudnorm_lra)
+        if audio_voice else None
     )
-    # loudnorm (EBU R128): đưa độ to cảm nhận về mức mục tiêu, khắc phục việc
-    # peak-clip cũ chỉ hạ âm lượng khi vượt đỉnh, không bao giờ nâng khi cả
-    # bài nhìn chung nhỏ.
+    # Mốc chuẩn hoá dub: ĐỘ TO THẬT CỦA GIỌNG GỐC khi tách được nó ra, thay cho
+    # con số -16 LUFS cố định. Tác giả video đã cân giọng với nhạc sẵn rồi, nên
+    # đặt dub đúng chỗ giọng gốc từng đứng là dub thừa hưởng luôn tỉ lệ đó,
+    # riêng cho từng video. Mốc này KHÔNG phụ thuộc thanh giọng gốc — kéo thanh
+    # đó lên xuống không được làm đổi độ to của chính giọng dub.
+    dub_target_i = mix_cfg.loudnorm_i
+    if voice_measured:
+        try:
+            measured_i = float(voice_measured["input_i"])
+        except (KeyError, TypeError, ValueError):
+            measured_i = None
+        # Video gần như không có tiếng nói (nhạc thuần, đoạn instrumental) ->
+        # stem giọng chỉ còn nhiễu tách, đo ra cực thấp. Lấy nó làm mốc là kéo
+        # dub xuống theo cho tới mức chìm hẳn dưới nhạc, nên dưới ngưỡng này
+        # coi như "không có giọng gốc để canh" và quay về mốc cố định.
+        if measured_i is not None and measured_i >= _VOICE_ANCHOR_MIN_LUFS:
+            # loudnorm chỉ nhận i trong [-70, -5] -> kẹp cho chắc.
+            dub_target_i = min(max(measured_i, -70.0), -5.0)
+
+    dub_measured = _measure_loudness(audio_dub, dub_target_i, mix_cfg.loudnorm_tp, mix_cfg.loudnorm_lra)
+    dub = _prenormalize_loudness(dub, dub_measured, dub_target_i, mix_cfg.loudnorm_tp, mix_cfg.loudnorm_lra)
+
+    mix_inputs = [ffmpeg.filter(dub, 'volume', dub_volume)]
+
+    if audio_bed:
+        bed = ffmpeg.input(audio_bed)
+        # Có giọng gốc: nhạc nền CỐ TÌNH không chuẩn hoá — nó phải giữ nguyên
+        # quan hệ tự nhiên với giọng gốc, thứ mà giọng dub vừa được canh theo;
+        # chuẩn hoá riêng lẻ nhạc nền là phá đúng cái cân bằng vừa mượn được.
+        # Không có giọng gốc (chưa tách): bed là audio gốc nguyên khối, không
+        # có mốc nào để mượn -> đưa về -16 LUFS như giọng dub.
+        if not audio_voice:
+            bed_measured = _measure_loudness(
+                audio_bed, mix_cfg.loudnorm_i, mix_cfg.loudnorm_tp, mix_cfg.loudnorm_lra,
+            )
+            bed = _prenormalize_loudness(
+                bed, bed_measured, mix_cfg.loudnorm_i, mix_cfg.loudnorm_tp, mix_cfg.loudnorm_lra,
+            )
+        mix_inputs.append(ffmpeg.filter(bed, 'volume', bed_volume))
+
+    if audio_voice and voice_volume > 0:
+        mix_inputs.append(ffmpeg.filter(ffmpeg.input(audio_voice), 'volume', voice_volume))
+
+    if len(mix_inputs) == 1:
+        # Chỉ có giọng dub -> không cần amix, đi thẳng vào loudnorm.
+        mixed_audio = mix_inputs[0]
+    else:
+        # amix mặc định normalize=1 → tự chia biên độ tổng cho số input khi
+        # trộn, làm giọng dub nhỏ hơn dự kiến một cách hệ thống dù đã tăng
+        # dub_volume (và càng lệch khi thêm input thứ 3). Tắt normalize, giữ
+        # cân bằng qua volume ở trên, rồi chuẩn hoá độ to cảm nhận ở loudnorm.
+        mixed_audio = ffmpeg.filter(
+            mix_inputs, 'amix', inputs=len(mix_inputs), duration='first', normalize=0,
+        )
+    # loudnorm (EBU R128) lần cuối trên track đã mix: an toàn cho biến động
+    # còn lại sau amix (2 nguồn đã pre-normalize + gain tỉ lệ ở trên không cho
+    # ra đúng target tuyệt đối), khắc phục việc peak-clip cũ chỉ hạ âm lượng
+    # khi vượt đỉnh, không bao giờ nâng khi cả bài nhìn chung nhỏ.
     mixed_audio = ffmpeg.filter(
         mixed_audio, 'loudnorm',
         i=mix_cfg.loudnorm_i, tp=mix_cfg.loudnorm_tp, lra=mix_cfg.loudnorm_lra,
