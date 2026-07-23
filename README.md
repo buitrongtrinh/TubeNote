@@ -31,7 +31,7 @@ more accurate at nearly the same VRAM cost, see `docs/dubbing.md`).
 
 | Video | Link |
 | --- | --- |
-| GUI walkthrough | [Watch on YouTube](https://www.youtube.com/watch?v=YOUR_GUI_DEMO_VIDEO_ID) |
+| GUI walkthrough | [Watch on YouTube](https://www.youtube.com/watch?v=hrQkGD67Iy8) |
 | Dubbed output sample | [Watch on YouTube](https://www.youtube.com/watch?v=Y1PnEIHituE) |
 
 <!-- GUI walkthrough is a placeholder link — replace YOUR_GUI_DEMO_VIDEO_ID
